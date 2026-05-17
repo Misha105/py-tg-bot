@@ -78,7 +78,8 @@ Does NOT require override:
 | `bot/services/lm_client.py` | `OpenRouterClient` — async httpx for `/api/v1/chat/completions`; retry 429/503 with exponential backoff; Bearer auth; raises `ConnectionError`/`RuntimeError`/`ValueError` |
 | `bot/services/context_manager.py` | `ConversationContext` — per-user `deque[dict[str, Any]]` with `maxlen`; per-user `asyncio.Lock` via `defaultdict`; `acquire()` context manager, `add_message()`, `get_history()`, `clear()` (atomic pop of history + lock) |
 | `bot/utils/prompt_loader.py` | `load_system_prompt(file_path)` — reads markdown, strips; fallback `"You are a helpful, concise assistant..."` |
-| `prompts/system.md` | System prompt loaded at config init |
+| `prompts/system.md` | Default system prompt loaded at config init (generic OMEGA PRIME) |
+| `prompts/system-deep4pro.md` | Model-specific prompt for DeepSeek V4 Pro (loaded via `.env` override) |
 | `scripts/verify_setup.py` | Validates `.env`, OpenRouter connectivity via `/api/v1/models`, project imports |
 | `scripts/test_lm_connection.py` | Async httpx test of `/chat/completions` |
 | `tests/test_access.py` | Parametrized: `is_user_allowed` (None, empty, allowed, denied) |

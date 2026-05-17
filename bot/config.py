@@ -24,11 +24,11 @@ class AppConfig(BaseSettings):
     bot_token: str
     openrouter_api_key: str
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_default_model: str = "openai/gpt-4o-mini"
+    openrouter_default_model: str = "google/gemma-4-31b-it"
     openrouter_referer: str = "https://github.com/your-org/telegram-bot"
     openrouter_title: str = "Local Telegram Bot"
     allowed_user_ids: set[int] | None = None
-    system_prompt_path: str = "prompts/system-deep4pro.md"
+    system_prompt_path: str = "prompts/system.md"
     system_prompt: str = ""
     max_history_messages: int = 10
     max_input_length: int = 4000
