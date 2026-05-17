@@ -224,3 +224,65 @@ async def test_chat_error_in_200_response_raises_value_error(client: OpenRouterC
     ):
         mock_post.return_value = mock_response
         await client.chat(messages=[{"role": "user", "content": "Hi"}])
+
+
+REFUSAL_RESPONSE = {
+    "choices": [{"message": {"content": None, "refusal": "Safety policy violation"}}],
+    "model": "openai/gpt-4o-mini",
+    "usage": {"total_tokens": 10},
+}
+
+
+async def test_chat_refusal_raises_value_error(client: OpenRouterClient) -> None:
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = REFUSAL_RESPONSE
+
+    with (
+        patch.object(client.client, "post", new_callable=AsyncMock) as mock_post,
+        pytest.raises(ValueError, match="LLM refused to answer"),
+    ):
+        mock_post.return_value = mock_response
+        await client.chat(messages=[{"role": "user", "content": "Hi"}])
+
+
+async def test_chat_null_message_field_raises_value_error(client: OpenRouterClient) -> None:
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "choices": [{"message": None}],
+        "model": "openai/gpt-4o-mini",
+    }
+
+    with (
+        patch.object(client.client, "post", new_callable=AsyncMock) as mock_post,
+        pytest.raises(ValueError, match="null content"),
+    ):
+        mock_post.return_value = mock_response
+        await client.chat(messages=[{"role": "user", "content": "Hi"}])
+
+
+LENGTH_TRUNCATED_RESPONSE = {
+    "choices": [
+        {
+            "message": {"content": "Truncated response"},
+            "finish_reason": "length",
+        }
+    ],
+    "model": "openai/gpt-4o-mini",
+    "usage": {"total_tokens": 2048},
+}
+
+
+async def test_chat_finish_reason_length_logs_warning(client: OpenRouterClient) -> None:
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = LENGTH_TRUNCATED_RESPONSE
+
+    with (
+        patch.object(client.client, "post", new_callable=AsyncMock) as mock_post,
+    ):
+        mock_post.return_value = mock_response
+        result = await client.chat(messages=[{"role": "user", "content": "Hi"}])
+
+    assert result == "Truncated response"

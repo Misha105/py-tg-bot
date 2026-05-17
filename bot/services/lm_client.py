@@ -189,15 +189,16 @@ class OpenRouterClient:
                 raise ValueError(f"OpenRouter error: {error_msg}")
 
             choice = data["choices"][0]
-            message_data = choice.get("message", {})
+            message_data = choice.get("message") or {}
             finish_reason = choice.get("finish_reason", "unknown")
 
             content: str | None = message_data.get("content")
             refusal: str | None = message_data.get("refusal")
 
             if refusal is not None:
-                logger.warning("LLM returned refusal: %s", refusal[:200])
-                raise ValueError(f"LLM refused to answer: {refusal[:200]}")
+                refusal_str = str(refusal)[:200]
+                logger.warning("LLM returned refusal: %s", refusal_str)
+                raise ValueError(f"LLM refused to answer: {refusal_str}")
 
             if content is None:
                 logger.error(
