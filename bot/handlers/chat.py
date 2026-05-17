@@ -32,6 +32,16 @@ async def handle_clear(message: Message, **data: Any) -> None:
     await message.answer("🗑️ Контекст очищен.")
 
 
+TELEGRAM_MAX_MESSAGE_LENGTH = 4096
+
+
+async def _send_long_message(message: Message, text: str) -> None:
+    """Send a long message split into chunks respecting Telegram's limit."""
+    for i in range(0, len(text), TELEGRAM_MAX_MESSAGE_LENGTH):
+        chunk = text[i : i + TELEGRAM_MAX_MESSAGE_LENGTH]
+        await message.answer(text=chunk)
+
+
 async def _keep_typing(bot: Bot, chat_id: int, interval: float = 4.0) -> None:
     while True:
         await asyncio.sleep(interval)
@@ -58,12 +68,14 @@ async def handle_message(
         await message.answer(f"⚠️ Сообщение слишком длинное. Максимум: {max_len} символов.")
         return
 
-    if message.from_user is None:
+    if message.from_user is None or message.bot is None:
         return
 
     user_id = message.from_user.id
 
-    await message.bot.send_chat_action(
+    bot = message.bot
+
+    await bot.send_chat_action(
         chat_id=message.chat.id,
         action="typing",
     )
@@ -71,7 +83,7 @@ async def handle_message(
     typing_task: asyncio.Task[None] | None = None
     try:
         typing_task = asyncio.create_task(
-            _keep_typing(message.bot, message.chat.id)
+            _keep_typing(bot, message.chat.id)
         )
         async with context.acquire(user_id):
             context.history[user_id].append({"role": "user", "content": message.text})
@@ -109,7 +121,7 @@ async def handle_message(
             with suppress(asyncio.CancelledError):
                 await typing_task
 
-    await message.answer(text=response_text[:4096])
+    await _send_long_message(message, response_text)
     logger.info(
         "User %s received response (%s chars)",
         user_id,
