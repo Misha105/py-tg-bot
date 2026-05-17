@@ -158,11 +158,23 @@ class OpenRouterClient:
 
         try:
             data = response.json()
+            if "error" in data:
+                error_info = data["error"]
+                if isinstance(error_info, dict):
+                    error_msg = error_info.get("message", str(error_info))
+                else:
+                    error_msg = str(error_info)
+                logger.error("OpenRouter error in 200 response: %s", error_msg)
+                raise ValueError(f"OpenRouter error: {error_msg}")
             content: str = data["choices"][0]["message"]["content"]
             if content is None:
                 raise ValueError("LLM returned null content")
         except (KeyError, IndexError, json.JSONDecodeError, TypeError) as exc:
-            logger.error("Invalid OpenRouter response format: %s", exc)
+            logger.error(
+                "Invalid OpenRouter response format: %s | body: %s",
+                exc,
+                response.text[:500],
+            )
             raise ValueError("Invalid LLM response format") from exc
 
         logger.info(

@@ -197,3 +197,17 @@ async def test_chat_retry_exhausted_raises_runtime_error(client: OpenRouterClien
         await client.chat(messages=[{"role": "user", "content": "Hi"}])
 
     assert mock_post.call_count == 3
+
+
+async def test_chat_error_in_200_response_raises_value_error(client: OpenRouterClient) -> None:
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = '{"error": {"message": "Model overloaded"}}'
+    mock_response.json.return_value = {"error": {"message": "Model overloaded"}}
+
+    with (
+        patch.object(client.client, "post", new_callable=AsyncMock) as mock_post,
+        pytest.raises(ValueError, match="OpenRouter error: Model overloaded"),
+    ):
+        mock_post.return_value = mock_response
+        await client.chat(messages=[{"role": "user", "content": "Hi"}])

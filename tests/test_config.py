@@ -15,6 +15,7 @@ def clear_lru_cache() -> None:
 def test_valid_config(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BOT_TOKEN", "test_token")
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")
+    monkeypatch.setenv("OPENROUTER_DEFAULT_MODEL", "openai/gpt-4o-mini")
     config = AppConfig()
     assert config.bot_token == "test_token"
     assert config.openrouter_base_url == "https://openrouter.ai/api/v1"

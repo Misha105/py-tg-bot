@@ -1,124 +1,106 @@
-# PROJECT AGENTS & AI WORKFLOW
+# Project Guide
 
-## 📦 STACK & CONVENTIONS
+## Stack
 
 | Layer | Technology |
 |---|---|
 | Runtime | Python 3.11+ |
-| Framework | aiogram 3.28 (async Telegram bot) |
-| HTTP Client | httpx 0.27 (async) |
+| Framework | aiogram 3.28 (async) |
+| HTTP | httpx 0.27 (async) |
 | Config | pydantic-settings 2.4 + python-dotenv 1.0 |
 | Testing | pytest 8.0 + pytest-asyncio 0.24 |
-| Linting | ruff 0.8 (E,F,W,I,N,UP,B,SIM,RUF100), ignore E501 |
-| Formatting | black 24.0, line-length 100 |
-| Type Checking | mypy 1.13 strict mode + pydantic.mypy plugin |
-| LLM Backend | OpenRouter API (OpenAI-compatible, Bearer auth, HTTP-Referer/X-Title headers required, provider/model naming) |
+| Lint | ruff 0.8 (E,F,W,I,N,UP,B,SIM,RUF100), ignore E501 |
+| Format | black 24.0, line-length 100 |
+| Types | mypy 1.13 strict + pydantic.mypy plugin |
+| LLM | OpenRouter API (OpenAI-compatible, Bearer auth, HTTP-Referer/X-Title, `provider/model` format) |
 
-**Conventions:**
-- Async-first architecture — no sync I/O in handlers
-- Type hints mandatory on all functions and methods; `mypy strict` enforced
-- Logging only (`logging` module with `RotatingFileHandler` 5MB/3 backups + `StreamHandler`) — no `print()` in production code
-- Strict PEP8, enforced via `ruff` + `black`
+## Conventions
+
+- Async-first — no sync I/O in handlers
+- Type hints on all functions/methods; `mypy strict`
+- Logging via `logging` (`RotatingFileHandler` 5MB/3 backups + `StreamHandler`) — no `print()`
+- PEP8 via `ruff` + `black`
 - Docstrings on public classes and functions
-- No comments unless explicitly requested
-- Handler signatures use `**data: Any`, NOT `data: dict[str, Any]`
+- No comments unless requested
+- Handler signatures: `**data: Any`, not `data: dict[str, Any]`
 
----
+## Context7 MCP
 
-## 🦥 CAVEMAN MODE (ENFORCED)
+Use **Context7 MCP** to fetch current documentation, API references, and code examples for any library or framework (aiogram, httpx, pydantic, pytest, etc.).
 
-All AI assistants operating on this repository MUST follow these rules:
+Use when you need to:
+- Verify API syntax or method signatures
+- Find correct usage patterns
+- Check behavior in recent versions (e.g., aiogram 3.x vs 2.x)
 
-### OUTPUT RULE
-Return ONLY complete file contents in fenced code blocks. NO conversational text. NO explanations. NO "Sure!", "Here is...", or sign-offs.
+**Procedure:**
+1. `context7_resolve-library-id` — resolve library name to a Context7 ID
+2. `context7_query-docs` — retrieve docs and examples
 
-### CONTEXT ASSUMPTION
-Assume full project context. NEVER repeat README, structure, or prior instructions. Reference files directly (`config.py:20`).
+Do NOT use for: refactoring, writing scripts from scratch, debugging business logic, code review, or general programming concepts.
 
-### TOKEN ECONOMY
-- Compress comments to minimum
-- Use references instead of repetition (`# See: config.py:20`)
-- Skip redundant imports if unchanged
-- Prefer minimal, production-ready code
-- Zero filler, zero padding
+## Output Rules (Caveman Mode)
 
-### EDIT PROTOCOL
-When modifying a file, output the **ENTIRE** file. Do NOT use partial diffs, `...` placeholders, or "rest unchanged" patterns.
+- **Output only** complete file contents in fenced code blocks. No conversational text, no explanations, no sign-offs.
+- **Assume** full project context. Never repeat README, structure, or prior instructions.
+- **Token economy:** compress comments, use references (`# See: config.py:20`), skip redundant imports, zero filler.
+- **Edit protocol:** output the **entire** file on every change. No partial diffs, no `...` placeholders.
+- **Error handling:** if ambiguous or contradictory:
+  ```
+  !CLARIFY_REQUIRED
+  ```
+  Stop. Do not guess. Wait for direction.
+- **Override Protocol:** structural/architectural changes require `!CONFIRM_CHANGE` and explicit approval.
 
-### ERROR HANDLING
-If a request is ambiguous, contradicts architecture, or requires assumptions that could break the system:
-```
-!CLARIFY_REQUIRED
-```
-Stop. Do not guess. Wait for explicit direction.
+### Override Examples
 
----
+Requires `!CONFIRM_CHANGE`:
+- New services, middleware, handlers, or deps
+- Changing `AppConfig` schema or validation
+- Package restructuring or logging architecture changes
 
-## 🗺️ ARCHITECTURE MAP
+Does NOT require override:
+- Bug fixes in existing modules
+- New tests for existing functionality
+- Config value updates
+- Minor refactoring preserving interfaces
+- Formatting/linting fixes
+
+## Architecture
 
 | File | Purpose |
 |---|---|
-| `bot/main.py` | Entry point — creates Bot, Dispatcher, OpenRouterClient, ConversationContext; registers `AccessMiddleware` on `dp.message`; sets `dp.workflow_data` with config/lm_client/context; starts polling with `skip_updates=True` |
-| `bot/config.py` | `AppConfig` (pydantic-settings, `env_file=".env"`); `@field_validator` strips trailing `/` from URL, validates `https` scheme for OpenRouter, parses `ALLOWED_USER_IDS` comma-string to `set[int]`; `@model_validator` loads system prompt via `prompt_loader`; `get_config()` is `@lru_cache(maxsize=1)` |
-| `bot/access.py` | Pure functions: `is_user_allowed(user_id, allowed_ids)` returns `True` if `allowed_ids` is `None`/empty; `log_access_attempt()` logs `ALLOWED`/`BLOCKED` status |
-| `bot/handlers/chat.py` | `chat_router` with `/start` command + catch-all text handler; extracts `config`, `lm_client`, `context` from `**data`; validates input length (`max_input_length=4000`); sends typing action; handles `ConnectionError`, `httpx.TimeoutException`, `ValueError`, generic `Exception`; truncates response to 4096 chars |
-| `bot/middlewares/access_middleware.py` | `AccessMiddleware(BaseMiddleware)` — checks `isinstance(event, Message)` and `event.from_user is None` guards; blocks non-private chats and unauthorized users; returns `None` to silently drop, passes to handler otherwise |
-| `bot/services/lm_client.py` | `OpenRouterClient` — async httpx client for OpenRouter `/api/v1/chat/completions`; retry logic for 429/503 with exponential backoff; Bearer auth; `HTTP-Referer`/`X-Title` headers; raises `ConnectionError` on `RequestError`, `RuntimeError` on `HTTPStatusError`, `ValueError` on null/malformed content |
-| `bot/services/context_manager.py` | `ConversationContext` — per-user `deque[dict[str, Any]]` with `maxlen`; `asyncio.Lock` per user via `defaultdict`; `acquire()` context manager, `add_message()`, `get_history()`, `clear()` (atomic pop of history + lock within same `async with`) |
-| `bot/utils/prompt_loader.py` | `load_system_prompt(file_path)` — reads markdown file, returns stripped content; fallback `"You are a helpful, concise assistant..."` on missing/empty/unreadable file |
-| `prompts/system.md` | System prompt loaded at config init via `model_validator` |
-| `scripts/verify_setup.py` | Validates `.env` (BOT_TOKEN format, OPENROUTER_API_KEY prefix, https scheme), tests OpenRouter connectivity via `/api/v1/models` endpoint, checks project imports |
-| `scripts/test_lm_connection.py` | Async httpx test of `/chat/completions` with "Hello" message |
-| `tests/test_access.py` | Parametrized tests for `is_user_allowed` (None, empty set, allowed, denied) |
-| `tests/test_config.py` | Tests `AppConfig` defaults, `ALLOWED_USER_IDS` parsing, trailing slash removal, invalid URL scheme; `clear_lru_cache` fixture auto-clears `get_config` cache |
-| `tests/test_context.py` | Tests `ConversationContext`: add/get, max_history truncation, clear, empty history, user isolation; no `@pytest.mark.asyncio` (auto mode) |
-| `tests/test_lm_client.py` | Tests `OpenRouterClient`: success, system_prompt, model_override, headers, timeout, 500 error, invalid JSON, null content, retry 429, retry exhausted |
+| `bot/main.py` | Entry point: Bot, Dispatcher, OpenRouterClient, ConversationContext; `AccessMiddleware` on `dp.message`; `dp.workflow_data` with config/lm_client/context; polling with `skip_updates=True` |
+| `bot/config.py` | `AppConfig` (pydantic-settings, `env_file=".env"`); strips trailing `/`, validates `https` for OpenRouter, parses `ALLOWED_USER_IDS` to `set[int]`; loads system prompt via `model_validator`; `get_config()` is `@lru_cache(maxsize=1)` |
+| `bot/access.py` | `is_user_allowed(user_id, allowed_ids)` — returns `True` if `allowed_ids` is None/empty; `log_access_attempt()` |
+| `bot/handlers/chat.py` | `chat_router` — `/start` + catch-all text handler; extracts `config`/`lm_client`/`context` from `**data`; validates input (max 4000 chars); typing action; catches `ConnectionError`, `httpx.TimeoutException`, `ValueError`, generic `Exception`; truncates response to 4096 chars |
+| `bot/middlewares/access_middleware.py` | `AccessMiddleware(BaseMiddleware)` — guards `isinstance(event, Message)` and `from_user is None`; blocks non-private chats and unauthorized users; returns `None` to silently drop |
+| `bot/services/lm_client.py` | `OpenRouterClient` — async httpx for `/api/v1/chat/completions`; retry 429/503 with exponential backoff; Bearer auth; raises `ConnectionError`/`RuntimeError`/`ValueError` |
+| `bot/services/context_manager.py` | `ConversationContext` — per-user `deque[dict[str, Any]]` with `maxlen`; per-user `asyncio.Lock` via `defaultdict`; `acquire()` context manager, `add_message()`, `get_history()`, `clear()` (atomic pop of history + lock) |
+| `bot/utils/prompt_loader.py` | `load_system_prompt(file_path)` — reads markdown, strips; fallback `"You are a helpful, concise assistant..."` |
+| `prompts/system.md` | System prompt loaded at config init |
+| `scripts/verify_setup.py` | Validates `.env`, OpenRouter connectivity via `/api/v1/models`, project imports |
+| `scripts/test_lm_connection.py` | Async httpx test of `/chat/completions` |
+| `tests/test_access.py` | Parametrized: `is_user_allowed` (None, empty, allowed, denied) |
+| `tests/test_config.py` | `AppConfig` defaults, `ALLOWED_USER_IDS` parsing, trailing slash, invalid URL scheme; `clear_lru_cache` fixture |
+| `tests/test_context.py` | ConversationContext: add/get, max_history, clear, empty, isolation; `asyncio_mode = "auto"` |
+| `tests/test_lm_client.py` | OpenRouterClient: success, system_prompt, model_override, headers, timeout, 500, invalid JSON, null content, retry 429, retry exhausted |
 
----
-
-## ✅ QUALITY & SAFETY GATES
+## Quality Gates
 
 - [ ] **0 hardcoded secrets** — `BOT_TOKEN`, `OPENROUTER_API_KEY` via `.env` only
-- [ ] **`.env` mandatory** — `AppConfig` requires `bot_token` and `openrouter_api_key`; fails without them
-- [ ] **pytest must pass** — `make test` exits 0 (24 tests, `asyncio_mode = "auto"`)
-- [ ] **mypy strict clean** — `make typecheck` exits 0; overrides for `bot.handlers.*` and `bot.middlewares.*` (`warn_return_any = false`)
-- [ ] **ruff clean** — `make lint` exits 0; rules: E,F,W,I,N,UP,B,SIM,RUF100
-- [ ] **black formatted** — `make format` applies ruff fix + black
-- [ ] **No sync I/O in async handlers** — all handlers use `async/await`
-- [ ] **Validate inputs before LLM calls** — `max_input_length=4000` guard, empty text check, `from_user is None` guard
-- [ ] **Atomic context operations** — `clear()` pops history and lock within same `async with` block
-- [ ] **Generic errors to user** — handler catches `ConnectionError`, `TimeoutException`, `ValueError`, `Exception` — returns user-friendly messages, logs details
-- [ ] **Middleware scope** — `AccessMiddleware` registered on `dp.message`, not `dp.update`; guards `isinstance(event, Message)` and `from_user is None`
-- [ ] **Prompt file loading** — system prompt from `prompts/system.md` via `prompt_loader.py`; fallback used if missing/empty/unreadable
-- [ ] **`get_config()` is `@lru_cache`** — tests must call `get_config.cache_clear()` via fixture
-- [ ] **Response truncation** — `message.answer(text=response_text[:4096])` respects Telegram limit
-- [ ] **No `dp.stop_polling()`** — aiogram 3.x handles shutdown; `finally` block closes `lm_client` and `bot.session`
-- [ ] **OPENROUTER_API_KEY validated on startup, never logged in plaintext**
-- [ ] **Model specified in `provider/model` format** (e.g., `openai/gpt-4o-mini`)
-
----
-
-## ⚠️ OVERRIDE PROTOCOL
-
-Caveman Mode is the **default** for all operations.
-
-For structural or architectural changes, the AI MUST output:
-```
-!CONFIRM_CHANGE
-```
-and wait for explicit user approval before proceeding.
-
-**Examples requiring `!CONFIRM_CHANGE`:**
-- Adding new service layers or middleware
-- Changing `AppConfig` schema or validation logic
-- Modifying handler signatures or dispatcher setup
-- Introducing new dependencies
-- Restructuring `bot/` package layout
-- Changing logging architecture (e.g., adding QueueHandler)
-
-**Examples NOT requiring override:**
-- Bug fixes within existing modules
-- Adding tests for existing functionality
-- Updating configuration values
-- Minor refactoring that preserves interfaces
-- Formatting/linting fixes
+- [ ] **`.env` mandatory** — `AppConfig` fails without `bot_token` and `openrouter_api_key`
+- [ ] **`make test` passes** — 24 tests, `asyncio_mode = "auto"`
+- [ ] **`make typecheck` passes** — mypy strict; overrides for `bot.handlers.*` and `bot.middlewares.*` (`warn_return_any = false`)
+- [ ] **`make lint` passes** — ruff: E,F,W,I,N,UP,B,SIM,RUF100
+- [ ] **`make format` passes** — ruff fix + black
+- [ ] **No sync I/O in async handlers**
+- [ ] **Inputs validated before LLM calls** — max 4000 chars, empty text check, `from_user is None` guard
+- [ ] **Atomic context operations** — `clear()` pops history + lock in same `async with`
+- [ ] **Generic errors to user** — handler catches all exceptions, logs details, returns friendly messages
+- [ ] **Middleware on `dp.message` only** — guards `isinstance(event, Message)` and `from_user is None`
+- [ ] **Prompt from file** — `prompts/system.md` via `prompt_loader.py`; fallback if missing
+- [ ] **`get_config()` cached** — `@lru_cache`; tests must call `get_config.cache_clear()` via fixture
+- [ ] **Response truncated** — `message.answer(text=response_text[:4096])`
+- [ ] **No `dp.stop_polling()`** — aiogram 3.x handles shutdown; `finally` closes `lm_client` and `bot.session`
+- [ ] **OPENROUTER_API_KEY validated on startup, never logged**
