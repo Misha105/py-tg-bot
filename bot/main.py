@@ -13,7 +13,7 @@ from bot.config import get_config
 from bot.handlers import chat_router
 from bot.middlewares.access_middleware import AccessMiddleware
 from bot.services.context_manager import ConversationContext
-from bot.services.lm_client import LMStudioClient
+from bot.services.lm_client import OpenRouterClient
 
 LOG_DIR = Path("logs")
 LOG_FILE = LOG_DIR / "bot.log"
@@ -61,13 +61,15 @@ async def main() -> None:
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
-    lm_client = LMStudioClient(
-        base_url=config.lm_studio_base_url,
-        api_key=config.lm_studio_api_key,
-        default_model=config.default_model,
+    lm_client = OpenRouterClient(
+        api_key=config.openrouter_api_key,
+        base_url=config.openrouter_base_url,
+        default_model=config.openrouter_default_model,
+        referer=config.openrouter_referer,
+        title=config.openrouter_title,
         timeout=config.response_timeout,
     )
-    logger.info("LM Studio client initialized at %s", config.lm_studio_base_url)
+    logger.info("OpenRouter client initialized at %s", config.openrouter_base_url)
 
     context = ConversationContext(max_history=config.max_history_messages)
 

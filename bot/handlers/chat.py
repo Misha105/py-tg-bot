@@ -9,7 +9,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from bot.config import AppConfig
-from bot.services.lm_client import LMStudioClient
+from bot.services.lm_client import OpenRouterClient
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ async def handle_message(
     **data: Any,
 ) -> None:
     config: AppConfig = data["config"]
-    lm_client: LMStudioClient = data["lm_client"]
+    lm_client: OpenRouterClient = data["lm_client"]
     context: Any = data["context"]
 
     if not message.text or not message.text.strip():

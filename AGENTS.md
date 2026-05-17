@@ -12,7 +12,7 @@
 | Linting | ruff 0.8 (E,F,W,I,N,UP,B,SIM,RUF100), ignore E501 |
 | Formatting | black 24.0, line-length 100 |
 | Type Checking | mypy 1.13 strict mode + pydantic.mypy plugin |
-| LLM Backend | LM Studio (OpenAI-compatible API at `/chat/completions`) |
+| LLM Backend | OpenRouter API (OpenAI-compatible, Bearer auth, HTTP-Referer/X-Title headers required, provider/model naming) |
 
 **Conventions:**
 - Async-first architecture — no sync I/O in handlers
@@ -58,28 +58,29 @@ Stop. Do not guess. Wait for explicit direction.
 
 | File | Purpose |
 |---|---|
-| `bot/main.py` | Entry point — creates Bot, Dispatcher, LMStudioClient, ConversationContext; registers `AccessMiddleware` on `dp.message`; sets `dp.workflow_data` with config/lm_client/context; starts polling with `skip_updates=True` |
-| `bot/config.py` | `AppConfig` (pydantic-settings, `env_file=".env"`); `@field_validator` strips trailing `/` from URL, parses `ALLOWED_USER_IDS` comma-string to `set[int]`; `@model_validator` loads system prompt via `prompt_loader`; `get_config()` is `@lru_cache(maxsize=1)` |
+| `bot/main.py` | Entry point — creates Bot, Dispatcher, OpenRouterClient, ConversationContext; registers `AccessMiddleware` on `dp.message`; sets `dp.workflow_data` with config/lm_client/context; starts polling with `skip_updates=True` |
+| `bot/config.py` | `AppConfig` (pydantic-settings, `env_file=".env"`); `@field_validator` strips trailing `/` from URL, validates `https` scheme for OpenRouter, parses `ALLOWED_USER_IDS` comma-string to `set[int]`; `@model_validator` loads system prompt via `prompt_loader`; `get_config()` is `@lru_cache(maxsize=1)` |
 | `bot/access.py` | Pure functions: `is_user_allowed(user_id, allowed_ids)` returns `True` if `allowed_ids` is `None`/empty; `log_access_attempt()` logs `ALLOWED`/`BLOCKED` status |
 | `bot/handlers/chat.py` | `chat_router` with `/start` command + catch-all text handler; extracts `config`, `lm_client`, `context` from `**data`; validates input length (`max_input_length=4000`); sends typing action; handles `ConnectionError`, `httpx.TimeoutException`, `ValueError`, generic `Exception`; truncates response to 4096 chars |
 | `bot/middlewares/access_middleware.py` | `AccessMiddleware(BaseMiddleware)` — checks `isinstance(event, Message)` and `event.from_user is None` guards; blocks non-private chats and unauthorized users; returns `None` to silently drop, passes to handler otherwise |
-| `bot/services/lm_client.py` | `LMStudioClient` — async httpx client with `base_url`; POST to `/chat/completions`; raises `ConnectionError` on `RequestError`, `RuntimeError` on `HTTPStatusError`, `ValueError` on null/malformed content |
+| `bot/services/lm_client.py` | `OpenRouterClient` — async httpx client for OpenRouter `/api/v1/chat/completions`; retry logic for 429/503 with exponential backoff; Bearer auth; `HTTP-Referer`/`X-Title` headers; raises `ConnectionError` on `RequestError`, `RuntimeError` on `HTTPStatusError`, `ValueError` on null/malformed content |
 | `bot/services/context_manager.py` | `ConversationContext` — per-user `deque[dict[str, Any]]` with `maxlen`; `asyncio.Lock` per user via `defaultdict`; `acquire()` context manager, `add_message()`, `get_history()`, `clear()` (atomic pop of history + lock within same `async with`) |
 | `bot/utils/prompt_loader.py` | `load_system_prompt(file_path)` — reads markdown file, returns stripped content; fallback `"You are a helpful, concise assistant..."` on missing/empty/unreadable file |
 | `prompts/system.md` | System prompt loaded at config init via `model_validator` |
-| `scripts/verify_setup.py` | Validates `.env` (BOT_TOKEN format, LM_STUDIO_BASE_URL scheme), tests LM Studio connectivity via `/models` endpoint, checks project imports |
+| `scripts/verify_setup.py` | Validates `.env` (BOT_TOKEN format, OPENROUTER_API_KEY prefix, https scheme), tests OpenRouter connectivity via `/api/v1/models` endpoint, checks project imports |
 | `scripts/test_lm_connection.py` | Async httpx test of `/chat/completions` with "Hello" message |
 | `tests/test_access.py` | Parametrized tests for `is_user_allowed` (None, empty set, allowed, denied) |
 | `tests/test_config.py` | Tests `AppConfig` defaults, `ALLOWED_USER_IDS` parsing, trailing slash removal, invalid URL scheme; `clear_lru_cache` fixture auto-clears `get_config` cache |
 | `tests/test_context.py` | Tests `ConversationContext`: add/get, max_history truncation, clear, empty history, user isolation; no `@pytest.mark.asyncio` (auto mode) |
+| `tests/test_lm_client.py` | Tests `OpenRouterClient`: success, system_prompt, model_override, headers, timeout, 500 error, invalid JSON, null content, retry 429, retry exhausted |
 
 ---
 
 ## ✅ QUALITY & SAFETY GATES
 
-- [ ] **0 hardcoded secrets** — `BOT_TOKEN`, `LM_STUDIO_API_KEY` via `.env` only
-- [ ] **`.env` mandatory** — `AppConfig` requires `bot_token`; fails without it
-- [ ] **pytest must pass** — `make test` exits 0 (14 tests, `asyncio_mode = "auto"`)
+- [ ] **0 hardcoded secrets** — `BOT_TOKEN`, `OPENROUTER_API_KEY` via `.env` only
+- [ ] **`.env` mandatory** — `AppConfig` requires `bot_token` and `openrouter_api_key`; fails without them
+- [ ] **pytest must pass** — `make test` exits 0 (24 tests, `asyncio_mode = "auto"`)
 - [ ] **mypy strict clean** — `make typecheck` exits 0; overrides for `bot.handlers.*` and `bot.middlewares.*` (`warn_return_any = false`)
 - [ ] **ruff clean** — `make lint` exits 0; rules: E,F,W,I,N,UP,B,SIM,RUF100
 - [ ] **black formatted** — `make format` applies ruff fix + black
@@ -92,6 +93,8 @@ Stop. Do not guess. Wait for explicit direction.
 - [ ] **`get_config()` is `@lru_cache`** — tests must call `get_config.cache_clear()` via fixture
 - [ ] **Response truncation** — `message.answer(text=response_text[:4096])` respects Telegram limit
 - [ ] **No `dp.stop_polling()`** — aiogram 3.x handles shutdown; `finally` block closes `lm_client` and `bot.session`
+- [ ] **OPENROUTER_API_KEY validated on startup, never logged in plaintext**
+- [ ] **Model specified in `provider/model` format** (e.g., `openai/gpt-4o-mini`)
 
 ---
 

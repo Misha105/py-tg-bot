@@ -22,24 +22,33 @@ class AppConfig(BaseSettings):
     )
 
     bot_token: str
-    lm_studio_base_url: str = "http://localhost:1234/v1"
-    lm_studio_api_key: str | None = None
+    openrouter_api_key: str
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_default_model: str = "openai/gpt-4o-mini"
+    openrouter_referer: str = "https://github.com/your-org/telegram-bot"
+    openrouter_title: str = "Local Telegram Bot"
     allowed_user_ids: set[int] | None = None
     system_prompt_path: str = "prompts/system.md"
     system_prompt: str = ""
-    default_model: str = "gemma-4-e4b-uncensored-hauhaucs-aggressive"
     max_history_messages: int = 10
     max_input_length: int = 4000
     response_timeout: int = 120
 
-    @field_validator("lm_studio_base_url", mode="before")
+    @field_validator("openrouter_base_url", mode="before")
     @classmethod
     def validate_base_url(cls, value: str) -> str:
         url = value.rstrip("/")
         parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https"):
-            raise ValueError("lm_studio_base_url must use http or https scheme")
+        if parsed.scheme != "https":
+            raise ValueError("openrouter_base_url must use https scheme")
         return url
+
+    @field_validator("openrouter_default_model", mode="before")
+    @classmethod
+    def validate_model(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("openrouter_default_model must not be empty")
+        return value.strip()
 
     @field_validator("allowed_user_ids", mode="before")
     @classmethod

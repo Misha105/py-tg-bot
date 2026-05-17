@@ -14,15 +14,18 @@ def clear_lru_cache() -> None:
 
 def test_valid_config(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BOT_TOKEN", "test_token")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")
     config = AppConfig()
     assert config.bot_token == "test_token"
-    assert config.lm_studio_base_url == "http://localhost:1234/v1"
+    assert config.openrouter_base_url == "https://openrouter.ai/api/v1"
+    assert config.openrouter_default_model == "openai/gpt-4o-mini"
     assert config.max_history_messages == 10
     assert config.response_timeout == 120
 
 
 def test_allowed_user_ids_parsed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BOT_TOKEN", "test_token")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")
     monkeypatch.setenv("ALLOWED_USER_IDS", "123, 456")
     config = AppConfig()
     assert config.allowed_user_ids == {123, 456}
@@ -30,6 +33,7 @@ def test_allowed_user_ids_parsed(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_empty_allowed_user_ids(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BOT_TOKEN", "test_token")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")
     monkeypatch.setenv("ALLOWED_USER_IDS", "")
     config = AppConfig()
     assert config.allowed_user_ids is None
@@ -37,13 +41,15 @@ def test_empty_allowed_user_ids(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_trailing_slash_removed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BOT_TOKEN", "test_token")
-    monkeypatch.setenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1/")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")
+    monkeypatch.setenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1/")
     config = AppConfig()
-    assert config.lm_studio_base_url == "http://localhost:1234/v1"
+    assert config.openrouter_base_url == "https://openrouter.ai/api/v1"
 
 
 def test_invalid_url_scheme(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BOT_TOKEN", "test_token")
-    monkeypatch.setenv("LM_STUDIO_BASE_URL", "ftp://localhost:1234")
-    with pytest.raises(ValueError, match="http or https"):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")
+    monkeypatch.setenv("OPENROUTER_BASE_URL", "http://localhost:1234")
+    with pytest.raises(ValueError, match="https scheme"):
         AppConfig()

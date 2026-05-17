@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 os.chdir(PROJECT_ROOT)
 
 TOKEN_PATTERN = re.compile(r"^\d+:[A-Za-z0-9_-]+$")
-URL_PATTERN = re.compile(r"^https?://")
+API_KEY_PATTERN = re.compile(r"^sk(-or)?-.+")
 
 MODULES_TO_CHECK = [
     "aiogram",
@@ -53,23 +53,37 @@ def check_env() -> list[str]:
     elif not TOKEN_PATTERN.match(bot_token):
         issues.append("BOT_TOKEN does not match expected format (digits:alphanumeric)")
 
-    base_url = env_vars.get("LM_STUDIO_BASE_URL", "").rstrip("/")
+    api_key = env_vars.get("OPENROUTER_API_KEY", "")
+    if not api_key:
+        issues.append("OPENROUTER_API_KEY is empty in .env")
+    elif not API_KEY_PATTERN.match(api_key):
+        issues.append("OPENROUTER_API_KEY must start with sk- or sk-or-")
+
+    base_url = env_vars.get("OPENROUTER_BASE_URL", "").rstrip("/")
     if not base_url:
-        issues.append("LM_STUDIO_BASE_URL is empty in .env")
-    elif not URL_PATTERN.match(base_url):
-        issues.append("LM_STUDIO_BASE_URL must start with http:// or https://")
+        issues.append("OPENROUTER_BASE_URL is empty in .env")
+    elif not base_url.startswith("https://"):
+        issues.append("OPENROUTER_BASE_URL must use https scheme")
 
     return issues
 
 
-def check_lm_studio(base_url: str) -> bool:
-    url = f"{base_url}/models"
+def check_openrouter(api_key: str) -> tuple[bool, str]:
+    url = "https://openrouter.ai/api/v1/models"
     try:
         req = urllib.request.Request(url, method="GET")
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return int(resp.status) == 200
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, TimeoutError):
-        return False
+        req.add_header("Authorization", f"Bearer {api_key}")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            status = int(resp.status)
+            if status == 200:
+                return True, "API key valid. Server responding."
+            return False, f"Unexpected status: {status}"
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            return False, f"API key rejected. Status: {exc.code}"
+        return False, f"OpenRouter server error. Status: {exc.code}"
+    except (urllib.error.URLError, OSError, TimeoutError) as exc:
+        return False, f"OpenRouter unreachable: {exc}"
 
 
 def check_imports() -> list[tuple[str, bool, str]]:
@@ -99,23 +113,26 @@ def main() -> None:
         for issue in env_issues:
             print(f"❌ {issue}")
 
-    print("\n[2/3] Checking LM Studio connectivity...")
+    print("\n[2/3] Checking OpenRouter connectivity...")
     env_file = PROJECT_ROOT / ".env"
-    base_url = "http://localhost:1234/v1"
+    api_key = ""
     if env_file.exists():
         for line in env_file.read_text(encoding="utf-8").splitlines():
             line = line.strip()
-            if line.startswith("LM_STUDIO_BASE_URL="):
-                base_url = line.split("=", 1)[1].strip().rstrip("/")
+            if line.startswith("OPENROUTER_API_KEY="):
+                api_key = line.split("=", 1)[1].strip()
                 break
 
-    if check_lm_studio(base_url):
-        print(f"✅ LM Studio: Online. Server responding at {base_url}")
-    else:
+    if not api_key:
         has_issues = True
-        print(
-            "❌ LM Studio: Unreachable or misconfigured. Ensure server is running on specified port."
-        )
+        print("❌ OPENROUTER_API_KEY not found in .env")
+    else:
+        success, message = check_openrouter(api_key)
+        if success:
+            print(f"✅ OpenRouter: {message}")
+        else:
+            has_issues = True
+            print(f"❌ OpenRouter: {message}")
 
     print("\n[3/3] Checking project imports...")
     import_results = check_imports()

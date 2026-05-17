@@ -1,15 +1,16 @@
-# Local LLM Telegram Bot (LM Studio + aiogram 3)
+# Telegram Bot (OpenRouter + aiogram 3)
 
 ## 📦 Overview
 
-Telegram bot that connects to a locally running LLM via LM Studio's OpenAI-compatible API. Built with **aiogram 3.x**, **pydantic-settings**, and **httpx**.
+Telegram bot that connects to cloud LLMs via OpenRouter's OpenAI-compatible API. Built with **aiogram 3.x**, **pydantic-settings**, and **httpx**.
 
 **Features:**
 - User whitelisting via `ALLOWED_USER_IDS`
 - Per-user conversation history with configurable retention
 - System prompt loaded from `prompts/system.md`
-- Graceful error handling and access logging
+- Graceful error handling with retry logic (429/503)
 - Async architecture with `asyncio.Lock` for thread-safe context management
+- OpenRouter analytics headers (`HTTP-Referer`, `X-Title`)
 
 **Stack:**
 | Component | Technology |
@@ -18,7 +19,7 @@ Telegram bot that connects to a locally running LLM via LM Studio's OpenAI-compa
 | Config | pydantic-settings + python-dotenv |
 | HTTP Client | httpx (async) |
 | Testing | pytest + pytest-asyncio |
-| LLM Backend | LM Studio (OpenAI-compatible API) |
+| LLM Backend | OpenRouter API (OpenAI-compatible) |
 
 ---
 
@@ -27,10 +28,10 @@ Telegram bot that connects to a locally running LLM via LM Studio's OpenAI-compa
 | Requirement | Version / Details |
 |---|---|
 | Python | 3.11+ |
-| LM Studio | Installed and running with OpenAI-compatible server enabled on port 1234 |
+| OpenRouter API Key | Get it at [openrouter.ai/keys](https://openrouter.ai/keys) |
 | Telegram Bot Token | Obtained from [@BotFather](https://t.me/BotFather) |
 
-> **Important:** LM Studio must have its local server started **before** launching the bot. Open LM Studio, load a model, and click **Start Server** (default: `http://localhost:1234/v1`).
+> **Important:** You must have a valid OpenRouter API key before starting the bot. Free models are available — no credit card required.
 
 ---
 
@@ -65,7 +66,13 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 4. Configure environment
+### 4. Get an OpenRouter API key
+
+1. Go to [openrouter.ai/keys](https://openrouter.ai/keys)
+2. Create a new key
+3. Copy the key (starts with `sk-or-v1-`)
+
+### 5. Configure environment
 
 ```bash
 # Linux / macOS
@@ -78,18 +85,12 @@ copy .env.example .env
 Copy-Item .env.example .env
 ```
 
-Edit `.env` and set at least `BOT_TOKEN`:
+Edit `.env` and set at least `BOT_TOKEN` and `OPENROUTER_API_KEY`:
 
 ```env
 BOT_TOKEN=your_telegram_bot_token_here
+OPENROUTER_API_KEY=sk-or-v1-your-key-here
 ```
-
-### 5. Start LM Studio
-
-1. Open LM Studio
-2. Load your preferred model
-3. Navigate to the **Server** tab
-4. Click **Start Server** (ensure it listens on `http://localhost:1234`)
 
 ### 6. Run the bot
 
@@ -108,15 +109,20 @@ All settings are managed via environment variables or a `.env` file. The bot use
 | Variable | Type | Default | Required | Description |
 |---|---|---|---|---|
 | `BOT_TOKEN` | `str` | — | **Yes** | Telegram bot token from @BotFather |
-| `LM_STUDIO_BASE_URL` | `str` | `http://localhost:1234/v1` | No | Base URL of the LM Studio API server (trailing slash stripped automatically) |
-| `LM_STUDIO_API_KEY` | `str` | `""` | No | API key for LM Studio (leave empty if not required) |
+| `OPENROUTER_API_KEY` | `str` | — | **Yes** | OpenRouter API key (starts with `sk-or-v1-` or `sk-`) |
+| `OPENROUTER_BASE_URL` | `str` | `https://openrouter.ai/api/v1` | No | Base URL of the OpenRouter API (must use https) |
+| `OPENROUTER_DEFAULT_MODEL` | `str` | `openai/gpt-4o-mini` | No | Default model in `provider/model` format |
+| `OPENROUTER_REFERER` | `str` | `https://github.com/your-org/telegram-bot` | No | HTTP-Referer header for OpenRouter analytics |
+| `OPENROUTER_TITLE` | `str` | `Local Telegram Bot` | No | X-Title header for OpenRouter usage tracking |
 | `ALLOWED_USER_IDS` | `str` | `""` | No | Comma-separated list of allowed Telegram user IDs. **Empty = open access** |
 | `SYSTEM_PROMPT_PATH` | `str` | `prompts/system.md` | No | Path to the system prompt markdown file |
-| `DEFAULT_MODEL` | `str` | `gemma-4-e4b-uncensored-hauhaucs-aggressive` | No | Default model name used for chat completions |
 | `MAX_HISTORY_MESSAGES` | `int` | `10` | No | Maximum number of messages retained per conversation |
-| `RESPONSE_TIMEOUT` | `int` | `120` | No | HTTP timeout in seconds for LLM requests |
+| `MAX_INPUT_LENGTH` | `int` | `4000` | No | Maximum user message length in characters |
+| `RESPONSE_TIMEOUT` | `int` | `120` | No | HTTP read/write timeout in seconds for LLM requests |
 
 > **Note on `SYSTEM_PROMPT`:** The system prompt is **not** stored in `.env`. It is loaded from the file specified in `SYSTEM_PROMPT_PATH` (default: `prompts/system.md`) via `@model_validator(mode="after")`. Edit that file directly to customize the bot's behavior.
+
+> **Note on model names:** OpenRouter uses `provider/model` format (e.g., `openai/gpt-4o-mini`, `anthropic/claude-3.5-sonnet`). See [openrouter.ai/models](https://openrouter.ai/models) for the full list.
 
 ---
 
@@ -144,7 +150,7 @@ python -m pytest --cov=bot --cov-report=term-missing
 python -m scripts/verify_setup
 ```
 
-### Test LM Studio connection directly
+### Test OpenRouter connection directly
 
 ```bash
 python -m scripts/test_lm_connection
@@ -153,7 +159,7 @@ python -m scripts/test_lm_connection
 ### Test configuration notes
 
 - `pytest-asyncio` is configured with `asyncio_mode = "auto"` — no `@pytest.mark.asyncio` decorator needed
-- Tests must **not** depend on LM Studio or Telegram API
+- Tests must **not** depend on OpenRouter or Telegram API
 - Use `monkeypatch.setenv()` for config tests, not `.env` file manipulation
 - Call `get_config.cache_clear()` before creating `AppConfig` instances in tests
 
@@ -161,17 +167,29 @@ python -m scripts/test_lm_connection
 
 ## 🔧 Troubleshooting
 
-### ConnectionRefused to LM Studio
+### 401/403 Unauthorized (Invalid API Key)
 
 | Symptom | Solution |
 |---|---|
-| `ConnectionRefusedError` or timeout when bot tries to reach LM Studio | 1. Ensure LM Studio is running<br>2. Click **Start Server** in the LM Studio UI<br>3. Verify `LM_STUDIO_BASE_URL` in `.env` matches the server address<br>4. Test manually: `python -m scripts/test_lm_connection` |
+| Bot fails with `OpenRouter error: 401` or `403` | 1. Verify `OPENROUTER_API_KEY` in `.env` is correct and not expired<br>2. Key must start with `sk-or-v1-` or `sk-`<br>3. Regenerate key at [openrouter.ai/keys](https://openrouter.ai/keys)<br>4. Restart the bot after updating `.env` |
 
-### Bot token invalid / 401 Unauthorized
+### 429 Rate Limited
 
 | Symptom | Solution |
 |---|---|
-| Bot fails to start with `401 Unauthorized` or `invalid token` error | 1. Check `BOT_TOKEN` in `.env` for typos, missing characters, or extra whitespace<br>2. Regenerate the token via @BotFather (`/token` command)<br>3. Restart the bot after updating `.env` |
+| Bot responds with `OpenRouter error: 429` | 1. OpenRouter rate limits vary by model and plan<br>2. The client automatically retries with exponential backoff (max 2 retries)<br>3. Switch to a model with higher rate limits<br>4. Reduce `MAX_HISTORY_MESSAGES` to decrease token usage per request |
+
+### Model not found
+
+| Symptom | Solution |
+|---|---|
+| Bot returns `OpenRouter error: 404` or `RuntimeError` | 1. Model name must use `provider/model` format (e.g., `openai/gpt-4o-mini`)<br>2. Check available models at [openrouter.ai/models](https://openrouter.ai/models)<br>3. Some models require credits — verify the model is free or you have balance |
+
+### Bot token invalid / 401 Unauthorized (Telegram)
+
+| Symptom | Solution |
+|---|---|
+| Bot fails to start with Telegram `401 Unauthorized` | 1. Check `BOT_TOKEN` in `.env` for typos, missing characters, or extra whitespace<br>2. Regenerate the token via @BotFather (`/token` command)<br>3. Restart the bot after updating `.env` |
 
 ### Silent response from bot (whitelist active)
 
@@ -183,7 +201,7 @@ python -m scripts/test_lm_connection
 
 | Symptom | Solution |
 |---|---|
-| Bot responds with timeout error or takes very long | 1. Increase `RESPONSE_TIMEOUT` in `.env` (default: 120s)<br>2. Ensure the model is **loaded** in LM Studio (not unloaded)<br>3. Use a smaller model or reduce `MAX_HISTORY_MESSAGES`<br>4. Check system resources (RAM/CPU) — local LLMs are resource-intensive |
+| Bot responds with timeout error or takes very long | 1. Increase `RESPONSE_TIMEOUT` in `.env` (default: 120s)<br>2. Some models are slower — try `openai/gpt-4o-mini` for faster responses<br>3. Reduce `MAX_HISTORY_MESSAGES` to decrease token count |
 
 ### ModuleNotFoundError on startup
 
@@ -205,7 +223,7 @@ python -m scripts/test_lm_connection
 py-tg-bot/
 ├── bot/
 │   ├── __init__.py
-│   ├── main.py              # Entry point: Bot, Dispatcher, LMStudioClient, startup
+│   ├── main.py              # Entry point: Bot, Dispatcher, OpenRouterClient, startup
 │   ├── config.py            # AppConfig (pydantic-settings), lru_cached get_config()
 │   ├── access.py            # Pure function: is_user_allowed() + log_access_attempt()
 │   ├── handlers/
@@ -213,15 +231,15 @@ py-tg-bot/
 │   ├── middlewares/
 │   │   └── access_middleware.py  # Filters by chat_type and allowed_user_ids
 │   └── services/
-│       ├── lm_client.py     # Async httpx client for LM Studio /chat/completions
+│       ├── lm_client.py     # Async httpx client for OpenRouter /api/v1/chat/completions
 │       └── context_manager.py    # Per-user conversation history with asyncio.Lock
 ├── utils/
 │   └── prompt_loader.py     # load_system_prompt() with lru_cache + fallback
 ├── prompts/
 │   └── system.md            # System prompt (loaded at config init)
 ├── scripts/
-│   ├── verify_setup.py      # Validate .env, LM Studio connectivity, imports
-│   └── test_lm_connection.py    # Test LM Studio API directly
+│   ├── verify_setup.py      # Validate .env, OpenRouter connectivity, imports
+│   └── test_lm_connection.py    # Test OpenRouter API directly
 ├── tests/                   # Pytest test suite
 ├── .env.example             # Environment template
 ├── requirements.txt         # Python dependencies
