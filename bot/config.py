@@ -119,6 +119,7 @@ class AppConfig(BaseSettings):
                 reasoning_effort=self.reasoning_effort,
                 max_completion_tokens=self.max_completion_tokens,
                 verbosity=self.verbosity,
+                thinking_enabled=self.thinking_enabled,
             )
         except KeyError:
             self.system_prompt = raw
