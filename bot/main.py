@@ -23,6 +23,9 @@ logger = logging.getLogger("bot")
 
 
 def setup_logging() -> logging.Logger:
+    if logger.handlers:
+        return logger
+
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
     logger.setLevel(logging.INFO)

@@ -33,6 +33,12 @@ class AppConfig(BaseSettings):
     max_history_messages: int = 10
     max_input_length: int = 4000
     response_timeout: int = 120
+    max_completion_tokens: int = 1024
+    top_p: float = 0.9
+    presence_penalty: float = 0.3
+    frequency_penalty: float = 0.0
+    verbosity: str = "low"
+    temperature: float = 0.7
 
     @field_validator("openrouter_base_url", mode="before")
     @classmethod
@@ -49,6 +55,34 @@ class AppConfig(BaseSettings):
         if not value or not value.strip():
             raise ValueError("openrouter_default_model must not be empty")
         return value.strip()
+
+    @field_validator("temperature")
+    @classmethod
+    def validate_temperature(cls, value: float) -> float:
+        if not 0.0 <= value <= 2.0:
+            raise ValueError("temperature must be between 0.0 and 2.0")
+        return value
+
+    @field_validator("top_p")
+    @classmethod
+    def validate_top_p(cls, value: float) -> float:
+        if not 0.0 <= value <= 1.0:
+            raise ValueError("top_p must be between 0.0 and 1.0")
+        return value
+
+    @field_validator("presence_penalty", "frequency_penalty")
+    @classmethod
+    def validate_penalty(cls, value: float) -> float:
+        if not -2.0 <= value <= 2.0:
+            raise ValueError("penalty must be between -2.0 and 2.0")
+        return value
+
+    @field_validator("verbosity")
+    @classmethod
+    def validate_verbosity(cls, value: str) -> str:
+        if value not in ("low", "medium", "high", "xhigh", "max"):
+            raise ValueError("verbosity must be one of: low, medium, high, xhigh, max")
+        return value
 
     @field_validator("allowed_user_ids", mode="before")
     @classmethod

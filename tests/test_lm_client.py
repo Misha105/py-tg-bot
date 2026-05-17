@@ -36,7 +36,15 @@ async def test_chat_success(client: OpenRouterClient) -> None:
 
     with patch.object(client.client, "post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = mock_response
-        result = await client.chat(messages=[{"role": "user", "content": "Hi"}])
+        result = await client.chat(
+            messages=[{"role": "user", "content": "Hi"}],
+            temperature=0.7,
+            max_completion_tokens=1024,
+            top_p=0.9,
+            presence_penalty=0.3,
+            frequency_penalty=0.0,
+            verbosity="low",
+        )
 
     assert result == "Hello from OpenRouter"
     mock_post.assert_called_once_with(
@@ -45,6 +53,11 @@ async def test_chat_success(client: OpenRouterClient) -> None:
             "model": "openai/gpt-4o-mini",
             "messages": [{"role": "user", "content": "Hi"}],
             "temperature": 0.7,
+            "max_completion_tokens": 1024,
+            "top_p": 0.9,
+            "presence_penalty": 0.3,
+            "frequency_penalty": 0.0,
+            "verbosity": "low",
         },
     )
 

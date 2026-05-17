@@ -60,6 +60,11 @@ class OpenRouterClient:
         system_prompt: str | None = None,
         model: str | None = None,
         temperature: float = 0.7,
+        max_completion_tokens: int | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
+        verbosity: str | None = None,
     ) -> str:
         """Send a chat completion request to OpenRouter.
 
@@ -68,6 +73,11 @@ class OpenRouterClient:
             system_prompt: Optional system prompt to prepend.
             model: Optional model override; defaults to self.default_model.
             temperature: Sampling temperature.
+            max_completion_tokens: Upper limit for generated tokens.
+            top_p: Nucleus sampling threshold.
+            presence_penalty: Penalty for token repetition based on presence.
+            frequency_penalty: Penalty for token repetition based on frequency.
+            verbosity: Response verbosity level (low, medium, high).
 
         Returns:
             The assistant's response content string.
@@ -88,6 +98,17 @@ class OpenRouterClient:
             "messages": payload_messages,
             "temperature": temperature,
         }
+
+        if max_completion_tokens is not None:
+            payload["max_completion_tokens"] = max_completion_tokens
+        if top_p is not None:
+            payload["top_p"] = top_p
+        if presence_penalty is not None:
+            payload["presence_penalty"] = presence_penalty
+        if frequency_penalty is not None:
+            payload["frequency_penalty"] = frequency_penalty
+        if verbosity is not None:
+            payload["verbosity"] = verbosity
 
         for attempt in range(self.max_retries + 1):
             try:
