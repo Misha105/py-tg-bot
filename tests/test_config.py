@@ -32,6 +32,30 @@ def test_allowed_user_ids_parsed(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.allowed_user_ids == {123, 456}
 
 
+def test_allowed_user_ids_int(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BOT_TOKEN", "test_token")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")
+    monkeypatch.delenv("ALLOWED_USER_IDS", raising=False)
+    config = AppConfig(allowed_user_ids=42)
+    assert config.allowed_user_ids == {42}
+
+
+def test_allowed_user_ids_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BOT_TOKEN", "test_token")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")
+    monkeypatch.delenv("ALLOWED_USER_IDS", raising=False)
+    config = AppConfig(allowed_user_ids=[1, 2, 3])
+    assert config.allowed_user_ids == {1, 2, 3}
+
+
+def test_allowed_user_ids_tuple(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BOT_TOKEN", "test_token")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")
+    monkeypatch.delenv("ALLOWED_USER_IDS", raising=False)
+    config = AppConfig(allowed_user_ids=(4, 5))
+    assert config.allowed_user_ids == {4, 5}
+
+
 def test_empty_allowed_user_ids(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BOT_TOKEN", "test_token")
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")

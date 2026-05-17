@@ -103,10 +103,16 @@ class AppConfig(BaseSettings):
 
     @field_validator("allowed_user_ids", mode="before")
     @classmethod
-    def parse_allowed_user_ids(cls, value: str | None) -> set[int] | None:
-        if not value or not value.strip():
+    def parse_allowed_user_ids(cls, value: object) -> set[int] | None:
+        if value is None or (isinstance(value, str) and not value.strip()):
             return None
-        return {int(uid.strip()) for uid in value.split(",") if uid.strip()}
+        if isinstance(value, int):
+            return {value}
+        if isinstance(value, str):
+            return {int(uid.strip()) for uid in value.split(",") if uid.strip()}
+        if isinstance(value, (list, set, tuple, frozenset)):
+            return {int(v) for v in value}
+        return None
 
     @model_validator(mode="after")
     def load_system_prompt(self) -> AppConfig:
