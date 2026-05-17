@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -25,6 +26,13 @@ def client() -> OpenRouterClient:
 SUCCESS_RESPONSE = {
     "choices": [{"message": {"content": "Hello from OpenRouter"}}],
     "model": "openai/gpt-4o-mini",
+    "usage": {"total_tokens": 15},
+}
+
+
+DEEPSEEK_SUCCESS = {
+    "choices": [{"message": {"content": "Hello from DeepSeek"}}],
+    "model": "deepseek/deepseek-v4-pro",
     "usage": {"total_tokens": 15},
 }
 
@@ -60,6 +68,58 @@ async def test_chat_success(client: OpenRouterClient) -> None:
             "verbosity": "low",
         },
     )
+
+
+async def test_chat_thinking_for_deepseek(client: OpenRouterClient) -> None:
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = DEEPSEEK_SUCCESS
+
+    ds_client = OpenRouterClient(
+        api_key="sk-or-test-key",
+        base_url="https://openrouter.ai/api/v1",
+        default_model="deepseek/deepseek-v4-pro",
+        referer="https://github.com/test/bot",
+        title="Test Bot",
+        timeout=30,
+    )
+
+    with patch.object(ds_client.client, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_response
+        result = await ds_client.chat(
+            messages=[{"role": "user", "content": "Hi"}],
+            reasoning_effort="max",
+        )
+
+    assert result == "Hello from DeepSeek"
+    mock_post.assert_called_once_with(
+        "/chat/completions",
+        json={
+            "model": "deepseek/deepseek-v4-pro",
+            "messages": [{"role": "user", "content": "Hi"}],
+            "temperature": 0.0,
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": "max",
+        },
+    )
+
+
+async def test_chat_thinking_skipped_for_non_deepseek(client: OpenRouterClient) -> None:
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = SUCCESS_RESPONSE
+
+    with patch.object(client.client, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_response
+        await client.chat(
+            messages=[{"role": "user", "content": "Hi"}],
+            thinking_enabled=True,
+            reasoning_effort="max",
+        )
+
+    call_kwargs = mock_post.call_args.kwargs
+    assert "thinking" not in call_kwargs["json"]
+    assert "reasoning_effort" not in call_kwargs["json"]
 
 
 async def test_chat_with_system_prompt(client: OpenRouterClient) -> None:
@@ -126,9 +186,7 @@ async def test_chat_500_raises_runtime_error(client: OpenRouterClient) -> None:
     mock_response.status_code = 500
     mock_response.text = "Internal Server Error"
 
-    http_error = httpx.HTTPStatusError(
-        "Server error", request=MagicMock(), response=mock_response
-    )
+    http_error = httpx.HTTPStatusError("Server error", request=MagicMock(), response=mock_response)
 
     with (
         patch.object(client.client, "post", new_callable=AsyncMock) as mock_post,
@@ -197,9 +255,7 @@ async def test_chat_retry_exhausted_raises_runtime_error(client: OpenRouterClien
     mock_response.status_code = 429
     mock_response.text = "Rate limited"
 
-    error_429 = httpx.HTTPStatusError(
-        "Rate limited", request=MagicMock(), response=mock_response
-    )
+    error_429 = httpx.HTTPStatusError("Rate limited", request=MagicMock(), response=mock_response)
 
     with (
         patch.object(client.client, "post", new_callable=AsyncMock) as mock_post,
@@ -274,14 +330,51 @@ LENGTH_TRUNCATED_RESPONSE = {
 }
 
 
+REASONING_RESPONSE = {
+    "choices": [
+        {
+            "message": {
+                "content": "Final answer",
+                "reasoning_content": "Let me think step by step...",
+            }
+        }
+    ],
+    "model": "deepseek/deepseek-v4-pro",
+    "usage": {"total_tokens": 50},
+}
+
+
+async def test_chat_reasoning_content_handled(
+    client: OpenRouterClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = REASONING_RESPONSE
+
+    ds_client = OpenRouterClient(
+        api_key="sk-or-test-key",
+        base_url="https://openrouter.ai/api/v1",
+        default_model="deepseek/deepseek-v4-pro",
+        referer="https://github.com/test/bot",
+        title="Test Bot",
+        timeout=30,
+    )
+
+    with patch.object(ds_client.client, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_response
+        result = await ds_client.chat(messages=[{"role": "user", "content": "Think"}])
+
+    assert result == "Final answer"
+    assert any("reasoning_content" in rec.message for rec in caplog.records)
+
+
 async def test_chat_finish_reason_length_logs_warning(client: OpenRouterClient) -> None:
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = LENGTH_TRUNCATED_RESPONSE
 
-    with (
-        patch.object(client.client, "post", new_callable=AsyncMock) as mock_post,
-    ):
+    with (patch.object(client.client, "post", new_callable=AsyncMock) as mock_post,):
         mock_post.return_value = mock_response
         result = await client.chat(messages=[{"role": "user", "content": "Hi"}])
 

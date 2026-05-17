@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from bot.utils.prompt_loader import load_system_prompt
+from bot.utils.prompt_loader import load_system_prompt, template_system_prompt
 
 
 class AppConfig(BaseSettings):
@@ -28,17 +28,20 @@ class AppConfig(BaseSettings):
     openrouter_referer: str = "https://github.com/your-org/telegram-bot"
     openrouter_title: str = "Local Telegram Bot"
     allowed_user_ids: set[int] | None = None
-    system_prompt_path: str = "prompts/system.md"
+    system_prompt_path: str = "prompts/system-deep4pro.md"
     system_prompt: str = ""
     max_history_messages: int = 10
     max_input_length: int = 4000
     response_timeout: int = 120
-    max_completion_tokens: int = 2048
-    top_p: float = 0.9
-    presence_penalty: float = 0.3
+    max_completion_tokens: int = 16384
+    top_p: float = 0.0
+    presence_penalty: float = 0.0
     frequency_penalty: float = 0.0
-    verbosity: str = "low"
-    temperature: float = 0.7
+    verbosity: str = "max"
+    temperature: float = 0.0
+    thinking_enabled: bool = True
+    reasoning_effort: str = "max"
+    seed: int | None = None
 
     @field_validator("openrouter_base_url", mode="before")
     @classmethod
@@ -84,6 +87,20 @@ class AppConfig(BaseSettings):
             raise ValueError("verbosity must be one of: low, medium, high, xhigh, max")
         return value
 
+    @field_validator("reasoning_effort")
+    @classmethod
+    def validate_reasoning_effort(cls, value: str) -> str:
+        if value not in ("high", "max"):
+            raise ValueError("reasoning_effort must be one of: high, max")
+        return value
+
+    @field_validator("seed", mode="before")
+    @classmethod
+    def parse_seed(cls, value: str | int | None) -> int | None:
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        return int(value)
+
     @field_validator("allowed_user_ids", mode="before")
     @classmethod
     def parse_allowed_user_ids(cls, value: str | None) -> set[int] | None:
@@ -93,7 +110,18 @@ class AppConfig(BaseSettings):
 
     @model_validator(mode="after")
     def load_system_prompt(self) -> AppConfig:
-        self.system_prompt = load_system_prompt(Path(self.system_prompt_path))
+        raw = load_system_prompt(Path(self.system_prompt_path))
+        try:
+            self.system_prompt = template_system_prompt(
+                raw,
+                temperature=self.temperature,
+                model=self.openrouter_default_model,
+                reasoning_effort=self.reasoning_effort,
+                max_completion_tokens=self.max_completion_tokens,
+                verbosity=self.verbosity,
+            )
+        except KeyError:
+            self.system_prompt = raw
         return self
 
 

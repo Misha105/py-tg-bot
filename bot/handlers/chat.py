@@ -87,9 +87,7 @@ async def handle_message(
 
     typing_task: asyncio.Task[None] | None = None
     try:
-        typing_task = asyncio.create_task(
-            _keep_typing(bot, message.chat.id)
-        )
+        typing_task = asyncio.create_task(_keep_typing(bot, message.chat.id))
         async with context.acquire(user_id):
             context.history[user_id].append({"role": "user", "content": message.text})
             history = list(context.history[user_id])
@@ -102,6 +100,9 @@ async def handle_message(
                 presence_penalty=config.presence_penalty,
                 frequency_penalty=config.frequency_penalty,
                 verbosity=config.verbosity,
+                thinking_enabled=config.thinking_enabled,
+                reasoning_effort=config.reasoning_effort,
+                seed=config.seed,
             )
             context.history[user_id].append({"role": "assistant", "content": response_text})
     except ConnectionError as exc:

@@ -59,12 +59,15 @@ class OpenRouterClient:
         messages: list[dict[str, str]],
         system_prompt: str | None = None,
         model: str | None = None,
-        temperature: float = 0.7,
+        temperature: float = 0.0,
         max_completion_tokens: int | None = None,
         top_p: float | None = None,
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         verbosity: str | None = None,
+        thinking_enabled: bool = True,
+        reasoning_effort: str | None = None,
+        seed: int | None = None,
     ) -> str:
         """Send a chat completion request to OpenRouter.
 
@@ -78,6 +81,9 @@ class OpenRouterClient:
             presence_penalty: Penalty for token repetition based on presence.
             frequency_penalty: Penalty for token repetition based on frequency.
             verbosity: Response verbosity level (low, medium, high).
+            thinking_enabled: Enable chain-of-thought reasoning (DeepSeek V4 Pro).
+            reasoning_effort: Thinking depth (high, max).
+            seed: Deterministic seed for reproducible responses.
 
         Returns:
             The assistant's response content string.
@@ -109,6 +115,16 @@ class OpenRouterClient:
             payload["frequency_penalty"] = frequency_penalty
         if verbosity is not None:
             payload["verbosity"] = verbosity
+        model_name = model or self.default_model
+        is_deepseek = "deepseek" in model_name.lower()
+        if thinking_enabled and is_deepseek:
+            payload["thinking"] = {"type": "enabled"}
+            if reasoning_effort is not None:
+                payload["reasoning_effort"] = reasoning_effort
+        elif thinking_enabled and not is_deepseek:
+            logger.debug("thinking_enabled skipped: model %s does not support thinking", model_name)
+        if seed is not None:
+            payload["seed"] = seed
 
         for attempt in range(self.max_retries + 1):
             try:
@@ -117,7 +133,7 @@ class OpenRouterClient:
                     json=payload,
                 )
                 if response.status_code in RETRYABLE_STATUS_CODES and attempt < self.max_retries:
-                    wait = 2 ** attempt
+                    wait = 2**attempt
                     logger.warning(
                         "OpenRouter %s, retry %d/%d in %ds",
                         response.status_code,
@@ -131,7 +147,7 @@ class OpenRouterClient:
                 response.raise_for_status()
             except httpx.TimeoutException as exc:
                 if attempt < self.max_retries:
-                    wait = 2 ** attempt
+                    wait = 2**attempt
                     logger.warning(
                         "OpenRouter timeout, retry %d/%d in %ds: %s",
                         attempt + 1,
@@ -144,7 +160,7 @@ class OpenRouterClient:
                 raise
             except httpx.RequestError as exc:
                 if attempt < self.max_retries:
-                    wait = 2 ** attempt
+                    wait = 2**attempt
                     logger.warning(
                         "OpenRouter request error, retry %d/%d in %ds: %s",
                         attempt + 1,
@@ -157,8 +173,11 @@ class OpenRouterClient:
                 logger.warning("OpenRouter request failed after retries: %s", exc)
                 raise ConnectionError(f"Failed to connect to OpenRouter: {exc}") from exc
             except httpx.HTTPStatusError as exc:
-                if exc.response.status_code in RETRYABLE_STATUS_CODES and attempt < self.max_retries:
-                    wait = 2 ** attempt
+                if (
+                    exc.response.status_code in RETRYABLE_STATUS_CODES
+                    and attempt < self.max_retries
+                ):
+                    wait = 2**attempt
                     logger.warning(
                         "OpenRouter %s, retry %d/%d in %ds",
                         exc.response.status_code,
@@ -192,6 +211,22 @@ class OpenRouterClient:
             message_data = choice.get("message") or {}
             finish_reason = choice.get("finish_reason", "unknown")
 
+            actual_model = data.get("model", "unknown")
+            if actual_model != "unknown" and model_name not in actual_model:
+                logger.warning(
+                    "Model mismatch: requested %s, got %s",
+                    model_name,
+                    actual_model,
+                )
+
+            reasoning_content: str | None = message_data.get("reasoning_content")
+            if reasoning_content is not None:
+                logger.info(
+                    "reasoning_content received (%d chars) for model %s",
+                    len(reasoning_content),
+                    actual_model,
+                )
+
             content: str | None = message_data.get("content")
             refusal: str | None = message_data.get("refusal")
 
@@ -204,7 +239,7 @@ class OpenRouterClient:
                 logger.error(
                     "LLM returned null content (finish_reason=%s, model=%s, body=%s)",
                     finish_reason,
-                    data.get("model", "unknown"),
+                    actual_model,
                     response.text[:500],
                 )
                 raise ValueError("LLM returned null content")
@@ -212,7 +247,7 @@ class OpenRouterClient:
             if finish_reason == "length":
                 logger.warning(
                     "LLM response truncated due to max_completion_tokens (model=%s)",
-                    data.get("model", "unknown"),
+                    actual_model,
                 )
         except (KeyError, IndexError, json.JSONDecodeError, TypeError) as exc:
             logger.error(
@@ -224,7 +259,7 @@ class OpenRouterClient:
 
         logger.info(
             "OpenRouter response received (model=%s, tokens=%s, finish_reason=%s)",
-            data.get("model", "unknown"),
+            actual_model,
             data.get("usage", {}).get("total_tokens", "N/A"),
             finish_reason,
         )
