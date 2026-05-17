@@ -1,4 +1,4 @@
-"""Quick connection test for LM Studio API."""
+"""Quick connection test for OpenRouter API."""
 
 import asyncio
 import os
@@ -11,26 +11,28 @@ from dotenv import load_dotenv
 async def main() -> None:
     load_dotenv()
 
-    base_url = os.getenv("LM_STUDIO_BASE_URL", "").rstrip("/")
-    api_key = os.getenv("LM_STUDIO_API_KEY")
-    model = os.getenv("DEFAULT_MODEL", "gemma-4-e4b-uncensored-hauhaucs-aggressive")
+    base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    model = os.getenv("OPENROUTER_DEFAULT_MODEL", "google/gemma-4-31b-it")
 
-    if not base_url:
-        print("❌ LM_STUDIO_BASE_URL is not set in .env")
+    if not api_key:
+        print("❌ OPENROUTER_API_KEY is not set in .env")
         sys.exit(1)
 
     url = f"{base_url}/chat/completions"
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
 
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": "Hello"}],
-        "temperature": 0.5,
+        "temperature": 0.0,
+        "max_completion_tokens": 256,
     }
 
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         try:
             response = await client.post(url, headers=headers, json=payload)
             response.raise_for_status()

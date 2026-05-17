@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -19,6 +20,8 @@ LOG_DIR = Path("logs")
 LOG_FILE = LOG_DIR / "bot.log"
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
+_ON_RAILWAY = bool(os.getenv("RAILWAY_ENVIRONMENT"))
+
 logger = logging.getLogger("bot")
 
 
@@ -26,20 +29,20 @@ def setup_logging() -> logging.Logger:
     if logger.handlers:
         return logger
 
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-
     logger.setLevel(logging.INFO)
 
     formatter = logging.Formatter(LOG_FORMAT)
 
-    file_handler = RotatingFileHandler(
-        LOG_FILE,
-        maxBytes=5 * 1024 * 1024,
-        backupCount=3,
-        encoding="utf-8",
-    )
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    if not _ON_RAILWAY:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            LOG_FILE,
+            maxBytes=5 * 1024 * 1024,
+            backupCount=3,
+            encoding="utf-8",
+        )
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)

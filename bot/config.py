@@ -25,7 +25,7 @@ class AppConfig(BaseSettings):
     openrouter_api_key: str
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_default_model: str = "google/gemma-4-31b-it"
-    openrouter_referer: str = "https://github.com/your-org/telegram-bot"
+    openrouter_referer: str = ""
     openrouter_title: str = "Local Telegram Bot"
     allowed_user_ids: set[int] | None = None
     system_prompt_path: str = "prompts/system.md"
