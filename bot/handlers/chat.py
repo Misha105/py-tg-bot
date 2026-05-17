@@ -36,12 +36,15 @@ async def handle_clear(message: Message, **data: Any) -> None:
 
 async def _send_long_message(message: Message, text: str) -> None:
     """Send a long message split into chunks respecting Telegram's limit."""
+    chunks = 0
     for i in range(0, len(text), TELEGRAM_MAX_MESSAGE_LENGTH):
         chunk = text[i : i + TELEGRAM_MAX_MESSAGE_LENGTH]
         try:
             await message.answer(text=chunk)
+            chunks += 1
         except Exception:
             logger.error("Failed to send message chunk %d", i, exc_info=True)
+    logger.info("Sent %d message chunk(s) for response (%s chars)", chunks, len(text))
 
 
 async def _keep_typing(bot: Bot, chat_id: int, interval: float = 4.0) -> None:

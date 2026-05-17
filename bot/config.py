@@ -33,7 +33,7 @@ class AppConfig(BaseSettings):
     max_history_messages: int = 10
     max_input_length: int = 4000
     response_timeout: int = 120
-    max_completion_tokens: int = 1024
+    max_completion_tokens: int = 2048
     top_p: float = 0.9
     presence_penalty: float = 0.3
     frequency_penalty: float = 0.0

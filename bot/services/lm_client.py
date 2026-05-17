@@ -187,9 +187,32 @@ class OpenRouterClient:
                     error_msg = str(error_info)
                 logger.error("OpenRouter error in 200 response: %s", error_msg)
                 raise ValueError(f"OpenRouter error: {error_msg}")
-            content: str = data["choices"][0]["message"]["content"]
+
+            choice = data["choices"][0]
+            message_data = choice.get("message", {})
+            finish_reason = choice.get("finish_reason", "unknown")
+
+            content: str | None = message_data.get("content")
+            refusal: str | None = message_data.get("refusal")
+
+            if refusal is not None:
+                logger.warning("LLM returned refusal: %s", refusal[:200])
+                raise ValueError(f"LLM refused to answer: {refusal[:200]}")
+
             if content is None:
+                logger.error(
+                    "LLM returned null content (finish_reason=%s, model=%s, body=%s)",
+                    finish_reason,
+                    data.get("model", "unknown"),
+                    response.text[:500],
+                )
                 raise ValueError("LLM returned null content")
+
+            if finish_reason == "length":
+                logger.warning(
+                    "LLM response truncated due to max_completion_tokens (model=%s)",
+                    data.get("model", "unknown"),
+                )
         except (KeyError, IndexError, json.JSONDecodeError, TypeError) as exc:
             logger.error(
                 "Invalid OpenRouter response format: %s | body: %s",
@@ -199,8 +222,9 @@ class OpenRouterClient:
             raise ValueError("Invalid LLM response format") from exc
 
         logger.info(
-            "OpenRouter response received (model=%s, tokens=%s)",
+            "OpenRouter response received (model=%s, tokens=%s, finish_reason=%s)",
             data.get("model", "unknown"),
             data.get("usage", {}).get("total_tokens", "N/A"),
+            finish_reason,
         )
         return content
