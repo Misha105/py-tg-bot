@@ -15,6 +15,8 @@ from bot.services.lm_client import OpenRouterClient
 
 logger = logging.getLogger(__name__)
 
+TELEGRAM_MAX_MESSAGE_LENGTH = 4096
+
 chat_router = Router()
 
 
@@ -32,14 +34,14 @@ async def handle_clear(message: Message, **data: Any) -> None:
     await message.answer("🗑️ Контекст очищен.")
 
 
-TELEGRAM_MAX_MESSAGE_LENGTH = 4096
-
-
 async def _send_long_message(message: Message, text: str) -> None:
     """Send a long message split into chunks respecting Telegram's limit."""
     for i in range(0, len(text), TELEGRAM_MAX_MESSAGE_LENGTH):
         chunk = text[i : i + TELEGRAM_MAX_MESSAGE_LENGTH]
-        await message.answer(text=chunk)
+        try:
+            await message.answer(text=chunk)
+        except Exception:
+            logger.error("Failed to send message chunk %d", i, exc_info=True)
 
 
 async def _keep_typing(bot: Bot, chat_id: int, interval: float = 4.0) -> None:

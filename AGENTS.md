@@ -73,7 +73,7 @@ Does NOT require override:
 | `bot/main.py` | Entry point: Bot, Dispatcher, OpenRouterClient, ConversationContext; `AccessMiddleware` on `dp.message`; `dp.workflow_data` with config/lm_client/context; polling with `skip_updates=True` |
 | `bot/config.py` | `AppConfig` (pydantic-settings, `env_file=".env"`); strips trailing `/`, validates `https` for OpenRouter, parses `ALLOWED_USER_IDS` to `set[int]`; loads system prompt via `model_validator`; `get_config()` is `@lru_cache(maxsize=1)` |
 | `bot/access.py` | `is_user_allowed(user_id, allowed_ids)` — returns `True` if `allowed_ids` is None/empty; `log_access_attempt()` |
-| `bot/handlers/chat.py` | `chat_router` — `/start` + catch-all text handler; extracts `config`/`lm_client`/`context` from `**data`; validates input (max 4000 chars); typing action; catches `ConnectionError`, `httpx.TimeoutException`, `ValueError`, generic `Exception`; truncates response to 4096 chars |
+| `bot/handlers/chat.py` | `chat_router` — `/start` + catch-all text handler; extracts `config`/`lm_client`/`context` from `**data`; validates input (max 4000 chars); typing action; catches `ConnectionError`, `httpx.TimeoutException`, `ValueError`, generic `Exception`; splits response into 4096-char chunks |
 | `bot/middlewares/access_middleware.py` | `AccessMiddleware(BaseMiddleware)` — guards `isinstance(event, Message)` and `from_user is None`; blocks non-private chats and unauthorized users; returns `None` to silently drop |
 | `bot/services/lm_client.py` | `OpenRouterClient` — async httpx for `/api/v1/chat/completions`; retry 429/503 with exponential backoff; Bearer auth; raises `ConnectionError`/`RuntimeError`/`ValueError` |
 | `bot/services/context_manager.py` | `ConversationContext` — per-user `deque[dict[str, Any]]` with `maxlen`; per-user `asyncio.Lock` via `defaultdict`; `acquire()` context manager, `add_message()`, `get_history()`, `clear()` (atomic pop of history + lock) |
@@ -101,6 +101,6 @@ Does NOT require override:
 - [ ] **Middleware on `dp.message` only** — guards `isinstance(event, Message)` and `from_user is None`
 - [ ] **Prompt from file** — `prompts/system.md` via `prompt_loader.py`; fallback if missing
 - [ ] **`get_config()` cached** — `@lru_cache`; tests must call `get_config.cache_clear()` via fixture
-- [ ] **Response truncated** — `message.answer(text=response_text[:4096])`
+- [ ] **Response split into chunks** — `_send_long_message()` sends 4096-char chunks with error logging
 - [ ] **No `dp.stop_polling()`** — aiogram 3.x handles shutdown; `finally` closes `lm_client` and `bot.session`
 - [ ] **OPENROUTER_API_KEY validated on startup, never logged**
