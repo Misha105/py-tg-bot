@@ -30,6 +30,14 @@ class OpenRouterClient:
         self.api_key = api_key
         self.default_model = default_model
         self.max_retries = max_retries
+        headers: dict[str, str] = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
+        if referer:
+            headers["HTTP-Referer"] = referer
+        if title:
+            headers["X-Title"] = title
         self.client = httpx.AsyncClient(
             timeout=httpx.Timeout(
                 connect=5.0,
@@ -42,12 +50,7 @@ class OpenRouterClient:
                 max_keepalive_connections=20,
             ),
             base_url=base_url,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-                "HTTP-Referer": referer,
-                "X-Title": title,
-            },
+            headers=headers,
         )
 
     async def close(self) -> None:
