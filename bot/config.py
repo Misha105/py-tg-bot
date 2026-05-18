@@ -23,6 +23,7 @@ class AppConfig(BaseSettings):
 
     bot_token: str
     openrouter_api_key: str
+    langsearch_api_key: str | None = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_default_model: str = "google/gemma-4-31b-it"
     openrouter_referer: str = ""
@@ -34,6 +35,7 @@ class AppConfig(BaseSettings):
     max_input_length: int = 4000
     response_timeout: int = 120
     max_completion_tokens: int = 16384
+    search_result_count: int = 5
     top_p: float = 0.0
     presence_penalty: float = 0.0
     frequency_penalty: float = 0.0

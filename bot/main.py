@@ -11,6 +11,7 @@ from bot.config import get_config
 from bot.handlers import chat_router
 from bot.middlewares.access_middleware import AccessMiddleware
 from bot.services.context_manager import ConversationContext
+from bot.services.langsearch_client import LangSearchClient
 from bot.services.lm_client import OpenRouterClient
 
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -59,6 +60,11 @@ async def main() -> None:
     )
     logger.info("OpenRouter client initialized at %s", config.openrouter_base_url)
 
+    langsearch_client = None
+    if config.langsearch_api_key:
+        langsearch_client = LangSearchClient(api_key=config.langsearch_api_key)
+        logger.info("LangSearch client initialized")
+
     context = ConversationContext(max_history=config.max_history_messages)
 
     dp.startup.register(on_startup)
@@ -68,6 +74,7 @@ async def main() -> None:
 
     dp.workflow_data["config"] = config
     dp.workflow_data["lm_client"] = lm_client
+    dp.workflow_data["langsearch_client"] = langsearch_client
     dp.workflow_data["context"] = context
     dp.include_router(chat_router)
 
@@ -79,6 +86,8 @@ async def main() -> None:
         pass
     finally:
         await lm_client.close()
+        if langsearch_client:
+            await langsearch_client.close()
         await bot.session.close()
         logger.info("Bot shutdown complete")
 

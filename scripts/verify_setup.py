@@ -26,17 +26,19 @@ MODULES_TO_CHECK = [
     "bot.main",
     "bot.access",
     "bot.services.lm_client",
+    "bot.services.langsearch_client",
     "bot.services.context_manager",
 ]
 
 
-def check_env() -> list[str]:
-    issues = []
+def check_env() -> tuple[list[str], list[str]]:
+    issues: list[str] = []
+    warnings: list[str] = []
     env_file = PROJECT_ROOT / ".env"
 
     if not env_file.exists():
         issues.append(".env file not found. Copy .env.example to .env and configure it.")
-        return issues
+        return issues, warnings
 
     env_content = env_file.read_text(encoding="utf-8")
     env_vars = {}
@@ -59,13 +61,17 @@ def check_env() -> list[str]:
     elif not API_KEY_PATTERN.match(api_key):
         issues.append("OPENROUTER_API_KEY must start with sk- or sk-or-")
 
+    langsearch_key = env_vars.get("LANGSEARCH_API_KEY", "")
+    if not langsearch_key:
+        warnings.append("LANGSEARCH_API_KEY is empty. Web search functionality will be disabled.")
+
     base_url = env_vars.get("OPENROUTER_BASE_URL", "").rstrip("/")
     if not base_url:
         issues.append("OPENROUTER_BASE_URL is empty in .env")
     elif not base_url.startswith("https://"):
         issues.append("OPENROUTER_BASE_URL must use https scheme")
 
-    return issues
+    return issues, warnings
 
 
 def check_openrouter(api_key: str) -> tuple[bool, str]:
@@ -105,10 +111,16 @@ def main() -> None:
     has_issues = False
 
     print("\n[1/3] Checking .env file...")
-    env_issues = check_env()
-    if not env_issues:
+    env_issues, env_warnings = check_env()
+
+    if not env_issues and not env_warnings:
         print("✅ .env: Valid")
-    else:
+
+    if env_warnings:
+        for warning in env_warnings:
+            print(f"⚠️ {warning}")
+
+    if env_issues:
         has_issues = True
         for issue in env_issues:
             print(f"❌ {issue}")
