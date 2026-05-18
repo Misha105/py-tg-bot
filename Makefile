@@ -11,12 +11,11 @@ else
     VENV_PIP := .venv/bin/pip
 endif
 
-# Create virtual environment, install dependencies, and initialize logs directory
+# Create virtual environment and install dependencies
 # Note: Uses explicit venv python paths to avoid shell activation quirks in Make
 setup:
 	python -m venv .venv
 	$(VENV_PIP) install -r requirements.txt
-	$(VENV_PYTHON) -c "import os; os.makedirs('logs', exist_ok=True)"
 
 # Run the Telegram bot
 run:

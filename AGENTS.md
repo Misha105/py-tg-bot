@@ -18,7 +18,7 @@
 
 - Async-first — no sync I/O in handlers
 - Type hints on all functions/methods; `mypy strict`
-- Logging via `logging` (`RotatingFileHandler` 5MB/3 backups + `StreamHandler`) — no `print()`
+- Logging via `logging` (`StreamHandler` only) — no `print()`
 - PEP8 via `ruff` + `black`
 - Docstrings on public classes and functions
 - No comments unless requested
