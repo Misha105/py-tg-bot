@@ -7,7 +7,11 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-FALLBACK_PROMPT = "You are a helpful, concise assistant. Answer accurately and safely."
+FALLBACK_PROMPT = (
+    "You are a helpful, concise assistant. Answer accurately and safely. "
+    "STRICT PLAIN TEXT ONLY: Do not use any markdown formatting, bolding, italics, "
+    "headers, LaTeX, brackets, or bullets. Output clean, raw text only."
+)
 
 
 def load_system_prompt(file_path: str | Path) -> str:
