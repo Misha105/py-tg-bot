@@ -59,7 +59,7 @@ class OpenRouterClient:
 
     async def chat(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         system_prompt: str | None = None,
         model: str | None = None,
         temperature: float = 0.0,
@@ -71,7 +71,8 @@ class OpenRouterClient:
         thinking_enabled: bool = True,
         reasoning_effort: str | None = None,
         seed: int | None = None,
-    ) -> str:
+        tools: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """Send a chat completion request to OpenRouter.
 
         Args:
@@ -87,9 +88,10 @@ class OpenRouterClient:
             thinking_enabled: Enable chain-of-thought reasoning (DeepSeek V4 Pro).
             reasoning_effort: Thinking depth (high, max).
             seed: Deterministic seed for reproducible responses.
+            tools: Optional list of tool schemas for function calling.
 
         Returns:
-            The assistant's response content string.
+            The assistant's message dictionary.
 
         Raises:
             ConnectionError: On network or request failure.
@@ -97,7 +99,7 @@ class OpenRouterClient:
             RuntimeError: On non-2xx HTTP response.
             ValueError: On malformed or unexpected response format.
         """
-        payload_messages: list[dict[str, str]] = []
+        payload_messages: list[dict[str, Any]] = []
         if system_prompt is not None:
             payload_messages.append({"role": "system", "content": system_prompt})
         payload_messages.extend(messages)
@@ -128,6 +130,8 @@ class OpenRouterClient:
             logger.debug("thinking_enabled skipped: model %s does not support thinking", model_name)
         if seed is not None:
             payload["seed"] = seed
+        if tools is not None:
+            payload["tools"] = tools
 
         for attempt in range(self.max_retries + 1):
             try:
@@ -219,6 +223,7 @@ class OpenRouterClient:
                 )
 
             content: str | None = message_data.get("content")
+            tool_calls = message_data.get("tool_calls")
             refusal: str | None = message_data.get("refusal")
 
             if refusal is not None:
@@ -226,7 +231,7 @@ class OpenRouterClient:
                 logger.warning("LLM returned refusal: %s", refusal_str)
                 raise ValueError(f"LLM refused to answer: {refusal_str}")
 
-            if content is None:
+            if content is None and not tool_calls:
                 logger.error(
                     "LLM returned null content (finish_reason=%s, model=%s, body=%s)",
                     finish_reason,
@@ -254,4 +259,4 @@ class OpenRouterClient:
             data.get("usage", {}).get("total_tokens", "N/A"),
             finish_reason,
         )
-        return content
+        return message_data

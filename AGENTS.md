@@ -40,12 +40,12 @@ Use when you need to:
 
 Do NOT use for: refactoring, writing scripts from scratch, debugging business logic, code review, or general programming concepts.
 
-## Output Rules (Caveman Mode)
+## Output Rules (Agent Mode)
 
-- **Output only** complete file contents in fenced code blocks. No conversational text, no explanations, no sign-offs.
+- **Edit protocol:** Use code editing tools to apply changes directly to the files. Do NOT output the full file contents or large code blocks in the chat.
+- **Reporting:** After making changes, provide a short, concise summary of what was changed. No long explanations or conversational filler.
 - **Assume** full project context. Never repeat README, structure, or prior instructions.
 - **Token economy:** compress comments, use references (`# See: config.py:20`), skip redundant imports, zero filler.
-- **Edit protocol:** output the **entire** file on every change. No partial diffs, no `...` placeholders.
 - **Error handling:** if ambiguous or contradictory:
   ```
   !CLARIFY_REQUIRED

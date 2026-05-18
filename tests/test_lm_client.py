@@ -54,7 +54,7 @@ async def test_chat_success(client: OpenRouterClient) -> None:
             verbosity="low",
         )
 
-    assert result == "Hello from OpenRouter"
+    assert result == {"content": "Hello from OpenRouter"}
     mock_post.assert_called_once_with(
         "/chat/completions",
         json={
@@ -91,7 +91,7 @@ async def test_chat_thinking_for_deepseek(client: OpenRouterClient) -> None:
             reasoning_effort="max",
         )
 
-    assert result == "Hello from DeepSeek"
+    assert result == {"content": "Hello from DeepSeek"}
     mock_post.assert_called_once_with(
         "/chat/completions",
         json={
@@ -246,7 +246,7 @@ async def test_chat_retry_on_429_then_success(client: OpenRouterClient) -> None:
         mock_post.side_effect = [error_429, mock_response_200]
         result = await client.chat(messages=[{"role": "user", "content": "Hi"}])
 
-    assert result == "Hello from OpenRouter"
+    assert result == {"content": "Hello from OpenRouter"}
     assert mock_post.call_count == 2
 
 
@@ -365,7 +365,10 @@ async def test_chat_reasoning_content_handled(
         mock_post.return_value = mock_response
         result = await ds_client.chat(messages=[{"role": "user", "content": "Think"}])
 
-    assert result == "Final answer"
+    assert result == {
+        "content": "Final answer",
+        "reasoning_content": "Let me think step by step...",
+    }
     assert any("reasoning_content" in rec.message for rec in caplog.records)
 
 
@@ -378,4 +381,4 @@ async def test_chat_finish_reason_length_logs_warning(client: OpenRouterClient) 
         mock_post.return_value = mock_response
         result = await client.chat(messages=[{"role": "user", "content": "Hi"}])
 
-    assert result == "Truncated response"
+    assert result == {"content": "Truncated response"}
