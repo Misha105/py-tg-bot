@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import collections
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -20,7 +20,7 @@ class ConversationContext:
         self.locks: dict[int, asyncio.Lock] = collections.defaultdict(lambda: asyncio.Lock())
 
     @asynccontextmanager
-    async def acquire(self, user_id: int) -> AsyncIterator[None]:
+    async def acquire(self, user_id: int) -> AsyncGenerator[None]:
         """Acquire the lock for a specific user.
 
         Args:
@@ -60,4 +60,3 @@ class ConversationContext:
         """
         async with self.locks[user_id]:
             self.history.pop(user_id, None)
-            self.locks.pop(user_id, None)

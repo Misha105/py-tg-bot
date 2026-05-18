@@ -11,6 +11,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from bot.config import AppConfig
+from bot.services.context_manager import ConversationContext
 from bot.services.lm_client import OpenRouterClient
 
 logger = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ async def handle_start(message: Message) -> None:
 async def handle_clear(message: Message, **data: Any) -> None:
     if message.from_user is None:
         return
-    context: Any = data["context"]
+    context: ConversationContext = data["context"]
     await context.clear(message.from_user.id)
     await message.answer("🗑️ Контекст очищен.")
 
@@ -63,7 +64,7 @@ async def handle_message(
 ) -> None:
     config: AppConfig = data["config"]
     lm_client: OpenRouterClient = data["lm_client"]
-    context: Any = data["context"]
+    context: ConversationContext = data["context"]
 
     if not message.text or not message.text.strip():
         return

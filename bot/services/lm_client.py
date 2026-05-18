@@ -135,18 +135,6 @@ class OpenRouterClient:
                     "/chat/completions",
                     json=payload,
                 )
-                if response.status_code in RETRYABLE_STATUS_CODES and attempt < self.max_retries:
-                    wait = 2**attempt
-                    logger.warning(
-                        "OpenRouter %s, retry %d/%d in %ds",
-                        response.status_code,
-                        attempt + 1,
-                        self.max_retries,
-                        wait,
-                    )
-                    await asyncio.sleep(wait)
-                    continue
-
                 response.raise_for_status()
             except httpx.TimeoutException as exc:
                 if attempt < self.max_retries:
@@ -234,7 +222,7 @@ class OpenRouterClient:
             refusal: str | None = message_data.get("refusal")
 
             if refusal is not None:
-                refusal_str = str(refusal)[:200]
+                refusal_str = refusal[:200]
                 logger.warning("LLM returned refusal: %s", refusal_str)
                 raise ValueError(f"LLM refused to answer: {refusal_str}")
 

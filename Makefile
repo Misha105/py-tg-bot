@@ -53,4 +53,6 @@ check: format lint typecheck
 
 # Remove generated artifacts, caches, and virtual environment
 clean:
-	$(VENV_PYTHON) -c "import shutil, os, glob; [shutil.rmtree(d) for d in ['__pycache__', '.pytest_cache', 'htmlcov', 'logs', '.venv'] if os.path.exists(d)]; [os.remove(f) for f in glob.glob('.coverage*') if os.path.exists(f)]"
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	rm -rf .pytest_cache htmlcov logs .venv .coverage .coverage.*
