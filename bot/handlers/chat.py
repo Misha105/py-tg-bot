@@ -22,9 +22,10 @@ logger = logging.getLogger(__name__)
 TELEGRAM_MAX_MESSAGE_LENGTH = 4096
 
 SYSTEM_ANCHOR = (
-    "НАПОМИНАНИЕ: 1. Отвечай кратко (1-3 предложения). 2. Если не знаешь точный факт "
-    "и поиск ничего не дал — не выдумывай! Скажи 'Без понятия', 'Не в курсе' или 'Хер его знает'. "
-    "3. Никакой литературщины и ролевых действий в звездочках."
+    "REMINDER (STRICT RULES): 1. Keep your response extremely short (1-3 sentences max). "
+    "2. ANTI-HALLUCINATION: If you don't know the exact fact and search yielded no results, DO NOT GUESS. "
+    "Use phrases like 'Без понятия', 'Не в курсе', 'Хер его знает'. "
+    "3. No markdown formatting. No roleplay actions (no asterisks)."
 )
 
 chat_router = Router()
