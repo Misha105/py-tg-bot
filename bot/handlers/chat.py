@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 TELEGRAM_MAX_MESSAGE_LENGTH = 4096
 
+SYSTEM_ANCHOR = (
+    "НАПОМИНАНИЕ: 1. Отвечай кратко (1-3 предложения). 2. Если не знаешь точный факт "
+    "и поиск ничего не дал — не выдумывай! Скажи 'Без понятия', 'Не в курсе' или 'Хер его знает'. "
+    "3. Никакой литературщины и ролевых действий в звездочках."
+)
+
 chat_router = Router()
 
 WEB_SEARCH_TOOL = {
@@ -124,8 +130,10 @@ async def handle_message(
 
             tools = [WEB_SEARCH_TOOL] if langsearch_client else None
 
+            request_messages = history + [{"role": "system", "content": SYSTEM_ANCHOR}]
+
             response_message = await lm_client.chat(
-                messages=history,
+                messages=request_messages,
                 system_prompt=dynamic_system_prompt,
                 temperature=config.temperature,
                 max_completion_tokens=config.max_completion_tokens,
@@ -191,8 +199,10 @@ async def handle_message(
                             }
                         )
 
+                request_messages = history + [{"role": "system", "content": SYSTEM_ANCHOR}]
+
                 response_message = await lm_client.chat(
-                    messages=history,
+                    messages=request_messages,
                     system_prompt=dynamic_system_prompt,
                     temperature=config.temperature,
                     max_completion_tokens=config.max_completion_tokens,

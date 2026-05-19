@@ -36,11 +36,11 @@ class AppConfig(BaseSettings):
     response_timeout: int = 120
     max_completion_tokens: int = 16384
     search_result_count: int = 5
-    top_p: float = 0.0
+    top_p: float = 0.95
     presence_penalty: float = 0.0
     frequency_penalty: float = 0.0
     verbosity: str = "max"
-    temperature: float = 0.0
+    temperature: float = 0.7
     thinking_enabled: bool = True
     reasoning_effort: str = "max"
     seed: int | None = None
