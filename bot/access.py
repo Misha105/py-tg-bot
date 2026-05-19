@@ -20,8 +20,16 @@ def is_user_allowed(user_id: int, allowed_ids: set[int] | None) -> bool:
     return user_id in allowed_ids
 
 
+def mask_user_id(user_id: int) -> str:
+    """Mask a Telegram user ID for privacy compliance (PII protection)."""
+    uid_str = str(user_id)
+    if len(uid_str) <= 6:
+        return "***"
+    return f"{uid_str[:3]}***{uid_str[-3:]}"
+
+
 def log_access_attempt(user_id: int, chat_type: str, allowed: bool) -> None:
-    """Log an access attempt.
+    """Log an access attempt with a masked user ID for privacy.
 
     Args:
         user_id: Telegram user ID.
@@ -29,4 +37,5 @@ def log_access_attempt(user_id: int, chat_type: str, allowed: bool) -> None:
         allowed: Whether access was granted.
     """
     status = "ALLOWED" if allowed else "BLOCKED"
-    logger.info("Access: %s | Chat: %s | Status: %s", user_id, chat_type, status)
+    masked_uid = mask_user_id(user_id)
+    logger.info("Access: %s | Chat: %s | Status: %s", masked_uid, chat_type, status)

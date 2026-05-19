@@ -98,4 +98,5 @@ Does NOT require override:
 - [ ] **Atomic context operations**
 - [ ] **Middleware on `dp.message` only**
 - [ ] **Web Search Isolation** — Background queries use sliding history window (last 3 messages) and strict regex parsing
+- [ ] **Prompt Anchoring** — `SYSTEM_ANCHOR` is attached to the last `user` message in a local shallow copy of `history` to avoid multiple `system` messages (Gemma workaround) and prevent accumulation across turns
 - [ ] **`get_config()` cached** — `@lru_cache`

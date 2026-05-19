@@ -12,6 +12,7 @@ from aiogram import Bot, Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
+from bot.access import mask_user_id
 from bot.config import AppConfig
 from bot.services.context_manager import ConversationContext
 from bot.services.langsearch_client import LangSearchClient
@@ -131,10 +132,16 @@ async def handle_message(
 
             tools = [WEB_SEARCH_TOOL] if langsearch_client else None
 
-            request_messages = history + [{"role": "system", "content": SYSTEM_ANCHOR}]
+            # Anchor the strict constraints directly in the last user message to avoid multiple system messages,
+            # which breaks system prompt instruction-following (like date/time/persona) on certain models (e.g. Gemma).
+            if history and history[-1]["role"] == "user":
+                history[-1] = {
+                    "role": "user",
+                    "content": f"{history[-1]['content']}\n\n[SYSTEM REMINDER: {SYSTEM_ANCHOR}]",
+                }
 
             response_message = await lm_client.chat(
-                messages=request_messages,
+                messages=history,
                 system_prompt=dynamic_system_prompt,
                 temperature=config.temperature,
                 max_completion_tokens=config.max_completion_tokens,
@@ -200,10 +207,8 @@ async def handle_message(
                             }
                         )
 
-                request_messages = history + [{"role": "system", "content": SYSTEM_ANCHOR}]
-
                 response_message = await lm_client.chat(
-                    messages=request_messages,
+                    messages=history,
                     system_prompt=dynamic_system_prompt,
                     temperature=config.temperature,
                     max_completion_tokens=config.max_completion_tokens,
@@ -245,6 +250,6 @@ async def handle_message(
     await _send_long_message(message, response_text)
     logger.info(
         "User %s received response (%s chars)",
-        user_id,
+        mask_user_id(user_id),
         len(response_text),
     )
