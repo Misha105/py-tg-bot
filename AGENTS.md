@@ -8,7 +8,7 @@
 | Framework | aiogram 3.28 (async) |
 | HTTP | httpx 0.27 (async) |
 | Config | pydantic-settings 2.4 + python-dotenv 1.0 |
-| Testing | pytest 8.0 + pytest-asyncio 0.24 |
+| Testing | pytest 9.0.3+ + pytest-asyncio 1.3.0+ |
 | Lint | ruff 0.8 (E,F,W,I,N,UP,B,SIM,RUF100), ignore E501 |
 | Format | black 24.0, line-length 100 |
 | Types | mypy 1.13 strict + pydantic.mypy plugin |
